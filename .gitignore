@@ -1,0 +1,40 @@
+# Unreal Engine 5: generated files and local caches
+# Keep Source/, Content/, Config/, Plugins/ source and the .uproject file in Git.
+
+**/Binaries/
+**/Intermediate/
+**/DerivedDataCache/
+**/Saved/
+
+# Visual Studio / IDE local files
+.vs/
+.idea/
+*.sln
+*.suo
+*.VC.db
+*.VC.opendb
+*.VC.db-shm
+*.VC.db-wal
+*.opensdf
+*.sdf
+*.user
+*.userosscache
+*.sln.docstates
+
+# Local logs, crash dumps, temporary files
+*.log
+*.tmp
+*.dmp
+
+# Blender backup files (do not ignore .blend source files)
+*.blend1
+*.blend2
+
+# Python caches from asset-generation scripts
+__pycache__/
+*.pyc
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
