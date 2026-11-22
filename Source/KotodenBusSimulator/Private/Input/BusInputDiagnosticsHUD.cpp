@@ -1,6 +1,7 @@
 #include "BusInputDiagnosticsHUD.h"
 
 #include "Input/BusInputPlayerController.h"
+#include "Vehicle/BusPrototypeVehiclePawn.h"
 
 void ABusInputDiagnosticsHUD::DrawHUD()
 {
@@ -13,8 +14,9 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     }
 
     const FBusDriverInputState Input = Controller->GetDriverInputState();
+    const ABusPrototypeVehiclePawn* Vehicle = Cast<ABusPrototypeVehiclePawn>(Controller->GetPawn());
     const FString Lines[] = {
-        TEXT("P0-2 F310 / XInput"),
+        Vehicle ? TEXT("P0-3 Chaos / F310") : TEXT("P0-2 F310 / XInput"),
         FString::Printf(TEXT("RT throttle: %.3f   LT clutch: %.3f"), Input.Throttle, Input.Clutch),
         FString::Printf(TEXT("Left X steering: %+.3f"), Input.Steering),
         FString::Printf(TEXT("Right X: %+.3f   Right Y: %+.3f"), Input.RightStickX, Input.RightStickY),
@@ -31,5 +33,12 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     {
         DrawText(Line, FLinearColor::Cyan, LeftMargin, Y);
         Y += LineHeight;
+    }
+
+    if (Vehicle)
+    {
+        DrawText(FString::Printf(TEXT("Forward speed: %+.1f km/h   Service brake: %.3f"),
+            Vehicle->GetForwardSpeedKmh(), Vehicle->GetServiceBrakeCommand()),
+            FLinearColor::Cyan, LeftMargin, Y);
     }
 }

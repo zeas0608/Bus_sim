@@ -19,9 +19,9 @@
 2. Visual Studio Installer で Visual Studio 2022 Community（17.8 以降、17.10 推奨）に「C++ によるゲーム開発」ワークロード、MSVC v143 x64/x86 ビルドツール、Windows 10/11 SDK を入れる。対応するツールチェーンは [Epic の Visual Studio セットアップ手順（UE 5.5）](https://dev.epicgames.com/documentation/en-us/unreal-engine/setting-up-visual-studio-development-environment-for-cplusplus-projects-in-unreal-engine?application_version=5.5) を参照。
 3. このブランチをチェックアウトし、リポジトリ直下の `KotodenBusSimulator.uproject` を右クリックして「Generate Visual Studio project files」を選ぶ（Windows 11 では「その他のオプションを表示」の中にある場合がある）。別のエンジンが選ばれている場合は「Switch Unreal Engine version」で、インストールした 5.5.4 を選ぶ。
 4. 生成された `KotodenBusSimulator.sln` を Visual Studio で開き、`Development Editor` / `Win64` を選択して `KotodenBusSimulator` プロジェクトをビルドする。ビルドが成功したら `KotodenBusSimulator.uproject` をダブルクリックしてエディターを起動する。
-5. エンジン付属の空マップ `Entry` が開くことと、「Edit → Plugins」で Chaos Vehicles と Enhanced Input が有効になっていることを確認する。必要に応じて「Play」で空マップの実行開始・停止を確認する。走行確認用のマップや車両アセットはまだない。
+5. エンジン付属の空マップ `Entry` が開くことと、「Edit → Plugins」で Chaos Vehicles と Enhanced Input が有効になっていることを確認する。必要に応じて「Play」で空マップの実行開始・停止を確認する。
 
-依存先は UE 5.5.4 に同梱の Chaos Vehicles と Enhanced Input のみ。UE の利用条件が適用され、有料プラグインや追加アセットは不要。
+使用するプラグインは UE 5.5.4 に同梱の Chaos Vehicles と Enhanced Input。P0-3 の走行確認には同梱の Vehicle テンプレートから車両アセットを取り込む。UE の利用条件が適用され、有料アセットは不要。
 
 **P0-1 の検証状況:** ユーザーの Windows 環境（UE 5.5.4、Visual Studio 2022）で C++ ビルドとエディター起動に成功。
 
@@ -35,7 +35,13 @@
 4. Cyan（シアン色）のデバッグ表示でRT/LT、左・右スティック、A/LB/RBを確認する。
 
 既定の構成では Blueprint アセットの設定は不要。GameMode が入力用 Controller と診断用 HUD を選び、Controller が Enhanced Input アクションとマッピングを生成する。
-**P0-2 の変更はビルド未実施 / UE実行未確認 / F310実機未検証**。詳細は [F310入力テスト手順](docs/P0-2-F310-TEST.md) を参照。
+**P0-2 はユーザーの Windows 実機で F310 の全入力を確認済み**。詳細は [F310入力テスト手順](docs/P0-2-F310-TEST.md) を参照。
+
+## P0-3: Chaos 仮車両の走行
+
+UE 5.5.4 の Vehicle テンプレートから仮車両のアセットを移行し、車両 Blueprint と平坦な走行レベルを作る。C++ 側は P0-2 の入力を再利用し、RT・左スティック X・A を Chaos に渡す。追従カメラと、車速・連続ブレーキ指令の表示を追加した。
+
+最初に [Windows でのアセット設定と走行確認](docs/P0-3-CHAOS-DRIVE.md) を参照。P0-3 は **ビルド未実施 / UE実行未確認 / F310実機未検証**。
 
 ## C++ と Blueprint の構成
 
