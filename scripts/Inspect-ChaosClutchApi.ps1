@@ -24,8 +24,9 @@ $checks = [ordered]@{
         'ETorqueCombineMethod', 'ExternalTorqueCombineMethod'
     )
     "$plugin/Private/ChaosWheeledVehicleMovementComponent.cpp" = @(
-        '::ProcessMechanicalSimulation(', '::ApplyInput(', '::SetDriveTorque(',
-        '::SetBrakeTorque(', '::SetTorqueCombineMethod('
+        '::SetupVehicle(', 'if (bMechanicalSimEnabled)', '::ProcessMechanicalSimulation(',
+        '::ApplyInput(', '::SetDriveTorque(', '::SetBrakeTorque(', '::SetTorqueCombineMethod(',
+        'TorqueMToCm(', '::FillWheelOutputState(', '::ParallelUpdate('
     )
     "$core/Private/WheelSystem.cpp" = @(
         '::Simulate(', 'ExternalDriveTorque', 'ExternalBrakeTorque'

@@ -5,6 +5,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+struct FBusDriverInputState;
 
 // Four-wheel Chaos test vehicle. The Blueprint supplies the skeletal mesh and wheel setup.
 UCLASS()
@@ -21,6 +22,7 @@ public:
 protected:
     virtual void Tick(float DeltaSeconds) override;
     virtual void UnPossessed() override;
+    virtual void ApplyDriveAndBrake(const FBusDriverInputState& Input, float BrakeCommand);
 
 private:
     UPROPERTY(VisibleAnywhere, Category = "Prototype Camera")
