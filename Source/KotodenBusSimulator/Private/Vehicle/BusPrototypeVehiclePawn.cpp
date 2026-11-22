@@ -41,11 +41,15 @@ void ABusPrototypeVehiclePawn::Tick(float DeltaSeconds)
     const float BrakeRate = Input.bBrakeHeld ? BrakeRisePerSecond : -BrakeFallPerSecond;
     ServiceBrakeCommand = FMath::Clamp(ServiceBrakeCommand + BrakeRate * DeltaSeconds, 0.0f, 1.0f);
 
-    // Use the template's stock Chaos drivetrain. Clutch and shift buttons stay in the input state.
+    GetVehicleMovementComponent()->SetSteeringInput(Input.Steering);
+    ApplyDriveAndBrake(Input, ServiceBrakeCommand);
+}
+
+void ABusPrototypeVehiclePawn::ApplyDriveAndBrake(const FBusDriverInputState& Input, float BrakeCommand)
+{
     UChaosVehicleMovementComponent* Movement = GetVehicleMovementComponent();
     Movement->SetThrottleInput(Input.Throttle);
-    Movement->SetSteeringInput(Input.Steering);
-    Movement->SetBrakeInput(ServiceBrakeCommand);
+    Movement->SetBrakeInput(BrakeCommand);
 }
 
 void ABusPrototypeVehiclePawn::UnPossessed()
