@@ -23,11 +23,23 @@
 
 依存先は UE 5.5.4 に同梱の Chaos Vehicles と Enhanced Input のみ。UE の利用条件が適用され、有料プラグインや追加アセットは不要。
 
-**検証状況:** クラウドには UE がないため、ビルド未実施 / UE実行未確認 / F310実機未検証。上の手順で Windows で確認するまで、P0 の起動確認は未完了。
+**P0-1 の検証状況:** ユーザーの Windows 環境（UE 5.5.4、Visual Studio 2022）で C++ ビルドとエディター起動に成功。
+
+## P0-2: F310の入力を画面に表示する
+
+作業ブランチは `p0/f310-input-diagnostics`。
+
+1. UE5 を終了してから Visual Studio 2022 で `Development Editor` / `Win64` を選び、ビルドする。
+2. `KotodenBusSimulator.uproject` を開き、`Entry` マップで **Play** を押す。
+3. プレイ画面をクリックし、XInputモードのF310を動かす。
+4. Cyan（シアン色）のデバッグ表示でRT/LT、左・右スティック、A/LB/RBを確認する。
+
+既定の構成では Blueprint アセットの設定は不要。GameMode が入力用 Controller と診断用 HUD を選び、Controller が Enhanced Input アクションとマッピングを生成する。
+**P0-2 の変更はビルド未実施 / UE実行未確認 / F310実機未検証**。詳細は [F310入力テスト手順](docs/P0-2-F310-TEST.md) を参照。
 
 ## C++ と Blueprint の構成
 
-`Source/KotodenBusSimulator/` はゲーム用の Runtime モジュール。実装は `Private/` に置き、新しい型を他モジュールに公開する必要ができた時点で `Public/` を使う。UE API の入口は Chaos Vehicles の `UChaosWheeledVehicleMovementComponent` と、Enhanced Input の `UEnhancedPlayerInput` / `UEnhancedInputComponent` を想定する。現段階の C++ コードはモジュール登録のみ。
+`Source/KotodenBusSimulator/` はゲーム用の Runtime モジュール。実装は `Private/` に置き、新しい型を他モジュールに公開する必要ができた時点で `Public/` を使う。UE API の入口は Chaos Vehicles の `UChaosWheeledVehicleMovementComponent` と、Enhanced Input の `UEnhancedPlayerInput` / `UEnhancedInputComponent` を想定する。P0-2 の入力状態は `GetDriverInputState()` で C++ と Blueprint から参照できる。診断用 HUD はこの値を読み取って表示する。
 
 | 今後の配置 | 担当する処理 |
 | --- | --- |
