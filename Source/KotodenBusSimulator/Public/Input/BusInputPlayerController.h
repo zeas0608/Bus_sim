@@ -5,6 +5,7 @@
 #include "Input/BusDriverInputState.h"
 #include "BusInputPlayerController.generated.h"
 
+class UEnhancedInputLocalPlayerSubsystem;
 class UInputAction;
 class UInputMappingContext;
 struct FInputActionValue;
@@ -19,15 +20,13 @@ class KOTODENBUSSIMULATOR_API ABusInputPlayerController : public APlayerControll
     GENERATED_BODY()
 
 public:
-    ABusInputPlayerController();
-
     UFUNCTION(BlueprintPure, Category="Bus Input")
     FBusDriverInputState GetDriverInputState() const { return DriverInputState; }
 
 protected:
     virtual void SetupInputComponent() override;
     virtual void BeginPlay() override;
-    virtual void Tick(float DeltaSeconds) override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
     void EnsureRuntimeMapping();
@@ -51,6 +50,8 @@ private:
     void GearDownReleased(const FInputActionValue& Value);
     void GearUpPressed(const FInputActionValue& Value);
     void GearUpReleased(const FInputActionValue& Value);
+
+    TWeakObjectPtr<UEnhancedInputLocalPlayerSubsystem> MappingSubsystem;
 
     UPROPERTY(Transient)
     TObjectPtr<UInputMappingContext> RuntimeMapping;
@@ -82,7 +83,9 @@ private:
     UPROPERTY(VisibleAnywhere, Category="Bus Input")
     FBusDriverInputState DriverInputState;
 
-    // Easy to calibrate from C++ now; data-asset tuning is deferred to vehicle physics.
-    static constexpr float StickDeadZone = 0.10f;
-    static constexpr float TriggerDeadZone = 0.03f;
+    UPROPERTY(EditDefaultsOnly, Category="Bus Input", meta=(ClampMin="0.0", ClampMax="0.99"))
+    float StickDeadZone = 0.10f;
+
+    UPROPERTY(EditDefaultsOnly, Category="Bus Input", meta=(ClampMin="0.0", ClampMax="0.99"))
+    float TriggerDeadZone = 0.03f;
 };
