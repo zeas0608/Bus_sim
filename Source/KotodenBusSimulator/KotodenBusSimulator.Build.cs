@@ -6,7 +6,7 @@ public class KotodenBusSimulator : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
-        PrivateDependencyModuleNames.AddRange(new[] { "ChaosVehicles", "EnhancedInput" });
+        PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "EnhancedInput" });
+        PrivateDependencyModuleNames.AddRange(new[] { "ChaosVehicles", "InputCore" });
     }
 }
