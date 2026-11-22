@@ -45,4 +45,4 @@ UE 5.5.4 の [Vehicle テンプレート](https://dev.epicgames.com/documentatio
 
 - 車両質量（kg）・重心オフセットの上書き値（cm）・駆動方式（Differential Type）は **Vehicle Movement Component**。ホイールベース（cm）は前後輪のボーン間距離で決まり、試作では各 Wheel Setup の **Additional Offset** の X を前後輪ごとに変えて調整できる。見た目と一致させる場合は元の骨格配置も合わせる。車輪半径（cm）は前後の Chaos Wheel Blueprint の **Wheel Radius**。テンプレートへの影響を避ける場合は Wheel Blueprint を複製して仮車両の **Wheel Class** に指定する。
 - 車体・エンジン・ギア比・タイヤの設定は Epic のテンプレートを出典とする仮値。ブレーキ時間とカメラ位置も走行確認用の仮値。Chaos 標準の自動変速は今回の走行検証に使う。独自 MT、クラッチ物理、正式車両、高松市マップ、乗客は対象外。
-- P0-2 までのビルドと入力はユーザーの Windows で確認済み。P0-3 は **ビルド未実施 / UE実行未確認 / F310実機未検証**。上の手順で設定と走行を確認したら、ビルド結果、発進・左右旋回・停止・A 保持時に後退しないこと、ブレーキ指令の増減、P0-2 診断の結果を記録する。
+- P0-1〜P0-3 はユーザーの Windows（UE 5.5.4）で検証済み。P0-3 では F310 による発進・旋回・停止を確認した。
