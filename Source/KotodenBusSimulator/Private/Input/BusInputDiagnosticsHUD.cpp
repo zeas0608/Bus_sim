@@ -29,7 +29,7 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     float Y = 48.0f;
     for (const FString& Line : Lines)
     {
-        DrawText(Line, FLinearColor::Cyan, LeftMargin, Y);
+        DrawText(Line, FLinearColor(0.0f, 1.0f, 1.0f, 1.0f), LeftMargin, Y);
         Y += LineHeight;
     }
 }
