@@ -81,6 +81,28 @@ try {
     }
     Write-Host "Backup folder: $backupRoot"
 
+    # A previous -ExecutePythonScript run may have imported everything successfully,
+    # then closed the Editor by design. Do not import duplicate assets on the next run.
+    $reportPath = Join-Path $logFolder 'LatestImportResult.txt'
+    if (Test-Path -LiteralPath $reportPath -PathType Leaf) {
+        $firstLine = Get-Content -LiteralPath $reportPath -TotalCount 1
+        $busContent = Join-Path $projectRoot 'Content\Kotoden1086'
+        if ($firstLine -eq 'SUCCESS' -and (Test-Path -LiteralPath $busContent -PathType Container)) {
+            $existingMaps = @(Get-ChildItem -LiteralPath $busContent -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue | Sort-Object FullName -Descending)
+            if ($existingMaps.Count -gt 0) {
+                $mapFile = $existingMaps[0].FullName
+                $contentRoot = (Join-Path $projectRoot 'Content') + '\'
+                $relativeMap = $mapFile.Substring($contentRoot.Length)
+                $mapPackage = '/Game/' + [System.IO.Path]::ChangeExtension($relativeMap, $null).Replace('\', '/')
+                Write-Host "Previous bus import is SUCCESS. Opening the existing map without reimport: $mapPackage"
+                Start-Process -FilePath $editorExe -WorkingDirectory $projectRoot -ArgumentList @(
+                    ('"{0}"' -f $projectFile), $mapPackage, '-log') | Out-Null
+                Write-Host "If Unreal closes again, provide Saved\Setup1086\LatestImportResult.txt and the recent Saved\Logs project log."
+                exit 0
+            }
+        }
+    }
+
     Invoke-UnrealBuild -Step 'GenerateProjectFiles' -Parameters @('-projectfiles', "-project=$projectFile", '-game', '-rocket', '-progress')
     Invoke-UnrealBuild -Step 'BuildEditor' -Parameters @('KotodenBusSimulatorEditor', 'Win64', 'Development', "-Project=$projectFile", '-WaitMutex')
 
