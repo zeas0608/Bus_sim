@@ -4,6 +4,7 @@
 #include "Input/BusInputPlayerController.h"
 #include "Vehicle/BusClutchPrototypeVehiclePawn.h"
 #include "Vehicle/BusPrototypeVehiclePawn.h"
+#include "Vehicle/Kotoden1086Pawn.h"
 
 void ABusInputDiagnosticsHUD::DrawHUD()
 {
@@ -12,6 +13,12 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     const ABusInputPlayerController* Controller = Cast<ABusInputPlayerController>(GetOwningPlayerController());
     if (!Canvas || !Controller)
     {
+        return;
+    }
+
+    if (const auto* Bus = Cast<AKotoden1086Pawn>(Controller->GetPawn()))
+    {
+        DrawText(Bus->GetStatusText(), FLinearColor::White, 18.0f, 24.0f);
         return;
     }
 
