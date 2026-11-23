@@ -16,6 +16,20 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     report = output_dir / "LatestImportResult.txt"
     importer = project / "scripts" / "import_kotoden1086.py"
+
+    # The -ExecutePythonScript command line normally closes Unreal Editor after
+    # execution. Explicitly keep the full editor open so the user can test the
+    # freshly imported map without launching Unreal a second time.
+    # UE 5.5 exposes this through EditorPythonScripting (Editor Scripting Utilities).
+    keep_alive_api = getattr(ue, "EditorPythonScripting", None)
+    if keep_alive_api is not None:
+        try:
+            keep_alive_api.set_keep_python_script_alive(True)
+            ue.log("KOTODEN 1086: keeping Editor open after automation")
+        except Exception as exc:
+            ue.log_warning("KOTODEN 1086: could not set Editor keep-alive: " + str(exc))
+    else:
+        ue.log_warning("KOTODEN 1086: EditorPythonScripting keep-alive API unavailable")
     report.write_text(
         "RUNNING\n" + datetime.now().isoformat() + "\n" + str(importer),
         encoding="utf-8",
