@@ -6,6 +6,7 @@
 #include "Kotoden1086Pawn.generated.h"
 
 class UCameraComponent;
+class UBusTripRecorder;
 class UKotodenBusDisplay;
 class USpotLightComponent;
 class USkeletalMesh;
@@ -60,6 +61,11 @@ private:
     float BrakeNm[4]{};
     void CycleMode();
     void Ignition();
+    void ToggleRecording();
+    void RecordDrive(float Dt);
+    const TCHAR* EngineLabel() const;
+    UPROPERTY()
+    TObjectPtr<UBusTripRecorder> Recorder;
     void ApplyManual(const FBusDriverInputState& Input, float Dt, bool bInterlock);
     void ReleaseOverride();
     float EngineRPM() const;
