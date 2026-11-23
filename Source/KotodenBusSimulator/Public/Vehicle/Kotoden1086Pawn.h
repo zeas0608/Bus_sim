@@ -7,6 +7,7 @@
 
 class UCameraComponent;
 class UBusTripRecorder;
+class UBusDriveAudio;
 class UKotodenBusDisplay;
 class USpotLightComponent;
 class USkeletalMesh;
@@ -63,6 +64,8 @@ private:
     void Ignition();
     void ToggleRecording();
     void RecordDrive(float Dt);
+    UPROPERTY()
+    TObjectPtr<UBusDriveAudio> DriveAudio;
     const TCHAR* EngineLabel() const;
     UPROPERTY()
     TObjectPtr<UBusTripRecorder> Recorder;

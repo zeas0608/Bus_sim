@@ -14,6 +14,7 @@
 #include "InputCoreTypes.h"
 #include "KotodenBusDisplay.h"
 #include "Telemetry/BusTripRecorder.h"
+#include "Audio/BusDriveAudio.h"
 
 namespace
 {
@@ -100,6 +101,9 @@ AKotoden1086Pawn::AKotoden1086Pawn()
     CabCamera->SetRelativeRotation(FRotator(CabPitch, CabYaw, 0));
     CabCamera->FieldOfView = 90.f;
     CabCamera->bAutoActivate = false;
+    DriveAudio = CreateDefaultSubobject<UBusDriveAudio>(TEXT("DriveAudio"));
+    DriveAudio->SetupAttachment(GetMesh());
+    DriveAudio->bAutoActivate = false;
     Recorder = CreateDefaultSubobject<UBusTripRecorder>(TEXT("TripRecorder"));
     Display = CreateDefaultSubobject<UKotodenBusDisplay>(TEXT("BusBodyDisplay"));
 
@@ -257,6 +261,20 @@ void AKotoden1086Pawn::Tick(float Dt)
     Display->PoseWheels(*M);
     Display->PoseCab(DriverSteer, FMath::Abs(GetForwardSpeedKmh()), EngineRPM(),
         FrontDoor, MiddleDoor, DriverThrottle, GetServiceBrakeCommand(), Mode == EDriveMode::AT ? static_cast<int32>(Range) - 1 : 0);
+    if (IsLocallyControlled())
+    {
+        BusAudio::Controls Audio;
+        Audio.Rpm = EngineRPM();
+        Audio.Throttle = DriverThrottle;
+        Audio.SpeedMS = GetForwardSpeedKmh()/3.6f;
+        Audio.Brake = AppliedBrake;
+        Audio.Gear = DisplayGear();
+        Audio.DoorMoving = (FrontDoor > 0 && FrontDoor < 1) || (MiddleDoor > 0 && MiddleDoor < 1);
+        Audio.InCab = bCabView;
+        Audio.Load = Mode == EDriveMode::AT ? DriverThrottle * (Range != EBusDriveRange::Neutral) :
+            FMath::Clamp(FMath::Abs(Manual.AxleNm)/9000.f,0.f,1.f);
+        DriveAudio->Update(Audio);
+    }
     const float Period = FMath::Max(0.1f, SignalPeriodSeconds);
     SignalTime = FMath::Fmod(SignalTime + Dt, Period);
     const bool bFlash = SignalTime < Period * 0.5f;
@@ -309,6 +327,7 @@ void AKotoden1086Pawn::UnPossessed()
     ReleaseOverride();
     Mode = EDriveMode::AT;
     Manual.Reset();
+    DriveAudio->Stop();
     SetCabCursor(false);
     Range = EBusDriveRange::Neutral;
     DriverSteer = 0.f;
