@@ -4,7 +4,6 @@ import datetime as dt
 import hashlib
 import json
 from pathlib import Path
-import sys
 import urllib.request
 import uuid
 import zipfile
@@ -128,7 +127,5 @@ if __name__ == "__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("--saved",type=Path,required=True)
     parser.add_argument("--offline",action="store_true")
-    parser.add_argument("--deps",type=Path)
-    # --deps is inserted into sys.path by the Windows launcher before importing this module.
     args=parser.parse_args()
     run(args.saved,args.offline)

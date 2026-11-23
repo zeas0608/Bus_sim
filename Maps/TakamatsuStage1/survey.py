@@ -29,7 +29,7 @@ def project(lon, lat):
 
 
 def normalized(value):
-    return unicodedata.normalize("NFKC", value).replace(" ", "")
+    return re.sub(r"[\s()（）・]", "", unicodedata.normalize("NFKC", value)).removeprefix("JR")
 
 
 def is_five(value):
@@ -70,7 +70,8 @@ def read_route(path, today):
                 continue
             names = normalized(" ".join([r.get("route_short_name", ""), r.get("route_long_name", ""), trip.get("trip_headsign", "")]))
             # Never match 147 or another line solely by destination.
-            if re.search(r"(?<!\d)47(?!\d)", names) or "御厩" in names:
+            numbers = re.findall(r"(?<!\d)\d{1,3}(?!\d)", names)
+            if "47" in numbers or (not numbers and "御厩" in names):
                 trips[trip["trip_id"]] = trip
         times = defaultdict(list)
         for r in rows("stop_times"):
