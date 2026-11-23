@@ -27,8 +27,56 @@ try {
     $v = Get-Content -LiteralPath (Join-Path $UnrealRoot 'Engine\Build\Build.version') -Raw | ConvertFrom-Json
     if ("$($v.MajorVersion).$($v.MinorVersion).$($v.PatchVersion)" -ne '5.5.4') { throw 'UE 5.5.4 is required.' }
     . (Join-Path $PSScriptRoot 'find_1086_level.ps1')
-    $bus = Find-1086Level (Join-Path $projectRoot 'Content\Kotoden1086')
-    if ($null -eq $bus) { throw 'No complete local 1086 installation. Restore your existing Content or run UPGRADE_KOTODEN1086.cmd once.' }
+    $busRoot = Join-Path $projectRoot 'Content\Kotoden1086'
+    $bus = Find-1086Level $busRoot
+    if ($null -eq $bus) {
+        # Branch changes can hide Git-ignored .uasset/.umap files. Recover missing
+        # files from an old setup snapshot without overwriting anything.
+        . (Join-Path $PSScriptRoot 'restore_1086_content.ps1')
+        Restore-Missing1086Content -ProjectRoot $projectRoot -LogFolder (Join-Path $projectRoot 'Saved\Setup1086')
+        $bus = Find-1086Level $busRoot
+    }
+    if ($null -eq $bus) {
+        throw '1086 assets are not available. No new bus asset import was attempted. See Recovery_Backup, GitHub Desktop stash history and Saved\Setup1086\LatestRecoveryResult.txt.'
+    }
+    # One-time safety snapshot: this installer only creates new Stage01 packages.
+    # Keep a separate copy of locally generated bus assets and configuration.
+    $backupReceipt = Join-Path $saved 'stage1-bus-backup.json'
+    $needBackup = $true
+    if (Test-Path -LiteralPath $backupReceipt -PathType Leaf) {
+        try {
+            $oldBackup = Get-Content -LiteralPath $backupReceipt -Raw -Encoding UTF8 | ConvertFrom-Json
+            $oldMap = Join-Path (Join-Path $oldBackup.snapshot 'Content\Kotoden1086') ($bus.Directory.Name + '\L_1086_Drive.umap')
+            if ($oldBackup.busBuild -eq $bus.Directory.Name -and (Test-Path -LiteralPath $oldMap -PathType Leaf)) {
+                $needBackup = $false
+                Write-Host "Existing external bus backup: $($oldBackup.snapshot)"
+            }
+        } catch { Write-Warning "Existing backup receipt is invalid; a new copy will be made." }
+    }
+    if ($needBackup) {
+        $backup = Join-Path (Split-Path $projectRoot -Parent) ("Recovery_Backup\TakamatsuStage1-" + $revision)
+        $targetContent = Join-Path $backup 'Content'
+        New-Item -ItemType Directory -Force -Path $targetContent | Out-Null
+        $copyBus = Join-Path $targetContent 'Kotoden1086'
+        Write-Host 'Backing up local 1086 Content and Config before map import...'
+        Copy-Item -LiteralPath $busRoot -Destination $copyBus -Recurse -ErrorAction Stop
+        $configRoot = Join-Path $projectRoot 'Config'
+        if (Test-Path -LiteralPath $configRoot -PathType Container) {
+            Copy-Item -LiteralPath $configRoot -Destination (Join-Path $backup 'Config') -Recurse -ErrorAction Stop
+        }
+        # Verify that the backup is complete before continuing to downloads/build.
+        foreach ($src in @(Get-ChildItem -LiteralPath $busRoot -Recurse -File -ErrorAction Stop)) {
+            $relative = $src.FullName.Substring($busRoot.Length).TrimStart([char[]]@('\','/'))
+            $dest = Join-Path $copyBus $relative
+            if (-not (Test-Path -LiteralPath $dest -PathType Leaf) -or
+                (Get-FileHash -LiteralPath $src.FullName).Hash -ne (Get-FileHash -LiteralPath $dest).Hash) {
+                throw "Bus snapshot verification failed: $relative"
+            }
+        }
+        @{snapshot=$backup;busBuild=$bus.Directory.Name} | ConvertTo-Json |
+            Set-Content -LiteralPath $backupReceipt -Encoding UTF8
+        Write-Host "Verified external backup: $backup"
+    }
     if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "Missing UE bundled Python: $python" }
     # PowerShell 5.1 can strip quotes inside native -c arguments. Use a checked-in Python entry point.
     $runner = Join-Path $source 'windows_python.py'
