@@ -12,9 +12,10 @@ MATERIALS = ue.MaterialEditingLibrary
 
 
 def new_folder():
+    content = Path(ue.Paths.convert_relative_path_to_full(ue.Paths.project_content_dir()))
     for build in range(1, 1000):
         path = f"{BASE_FOLDER}/Build_{build:03d}"
-        if not ASSETS.does_directory_exist(path):
+        if not (content / path.removeprefix("/Game/")).exists() and not ASSETS.does_directory_exist(path):
             if ASSETS.make_directory(path):
                 return path
             raise RuntimeError(f"Cannot create {path}")
@@ -249,6 +250,7 @@ def run():
     mode_bp = create_driving_classes(folder, mesh)
     level = create_yard(folder, mode_bp)
     ue.log(f"1086: open {level} and press Play. Original assets are unchanged.")
+    return level
 
 
 if __name__ == "__main__":

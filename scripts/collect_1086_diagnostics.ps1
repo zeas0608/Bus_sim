@@ -46,6 +46,12 @@ if(Test-Path -LiteralPath $busContent -PathType Container) {
   @(Get-ChildItem -LiteralPath $busContent -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue |
      Sort-Object FullName | Select-Object -ExpandProperty FullName) | ForEach-Object {Add ([string]$_)}
 } else { Add 'No Content\Kotoden1086 folder found.' }
+Collect-Logs 'Setup and upgrade' $dest
+Get-ChildItem -LiteralPath $dest -Filter '*-UpgradeResult.json' -File |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object {
+    Add "Upgrade result: $($_.Name)"
+    Add (Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8)
+  }
 Collect-Logs 'Project logs' (Join-Path $root 'Saved\Logs')
 Collect-Logs 'UE 5.5 user logs' (Join-Path $env:LOCALAPPDATA 'UnrealEngine\5.5\Saved\Logs')
 Add '== Crash folders (names and recent time only) =='
