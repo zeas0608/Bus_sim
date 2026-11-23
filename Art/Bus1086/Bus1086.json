@@ -1,0 +1,583 @@
+{
+  "materials": {
+    "ExtSky": {
+      "rgb": [
+        0.155,
+        0.558,
+        0.787
+      ],
+      "metallic": 0.23,
+      "roughness": 0.3,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtPearl": {
+      "rgb": [
+        0.845,
+        0.88,
+        0.851
+      ],
+      "metallic": 0.13,
+      "roughness": 0.34,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtTeal": {
+      "rgb": [
+        0.026,
+        0.203,
+        0.319
+      ],
+      "metallic": 0.27,
+      "roughness": 0.34,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtWheelTrim": {
+      "rgb": [
+        0.089,
+        0.351,
+        0.531
+      ],
+      "metallic": 0.22,
+      "roughness": 0.32,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtIvory": {
+      "rgb": [
+        0.901,
+        0.89,
+        0.757
+      ],
+      "metallic": 0.08,
+      "roughness": 0.35,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtSlat": {
+      "rgb": [
+        0.068,
+        0.09,
+        0.103
+      ],
+      "metallic": 0.4,
+      "roughness": 0.4,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtSeam": {
+      "rgb": [
+        0.03,
+        0.048,
+        0.058
+      ],
+      "metallic": 0.16,
+      "roughness": 0.53,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtRubber": {
+      "rgb": [
+        0.02,
+        0.028,
+        0.033
+      ],
+      "metallic": 0.03,
+      "roughness": 0.69,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtMetal": {
+      "rgb": [
+        0.452,
+        0.497,
+        0.509
+      ],
+      "metallic": 0.75,
+      "roughness": 0.3,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtWheelSteel": {
+      "rgb": [
+        0.325,
+        0.378,
+        0.4
+      ],
+      "metallic": 0.81,
+      "roughness": 0.33,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtLug": {
+      "rgb": [
+        0.568,
+        0.599,
+        0.603
+      ],
+      "metallic": 0.79,
+      "roughness": 0.28,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtRoof": {
+      "rgb": [
+        0.649,
+        0.705,
+        0.724
+      ],
+      "metallic": 0.27,
+      "roughness": 0.42,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtGlass": {
+      "rgb": [
+        0.144,
+        0.323,
+        0.357
+      ],
+      "metallic": 0.08,
+      "roughness": 0.12,
+      "alpha": 0.17,
+      "emission": 0
+    },
+    "ExtMirror": {
+      "rgb": [
+        0.48,
+        0.61,
+        0.65
+      ],
+      "metallic": 0.89,
+      "roughness": 0.12,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtDeck": {
+      "rgb": [
+        0.126,
+        0.148,
+        0.155
+      ],
+      "metallic": 0,
+      "roughness": 0.76,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtInner": {
+      "rgb": [
+        0.534,
+        0.577,
+        0.568
+      ],
+      "metallic": 0.16,
+      "roughness": 0.51,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtMark": {
+      "rgb": [
+        0.989,
+        0.492,
+        0.052
+      ],
+      "metallic": 0.02,
+      "roughness": 0.5,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtDisplay": {
+      "rgb": [
+        0.012,
+        0.021,
+        0.021
+      ],
+      "metallic": 0.02,
+      "roughness": 0.49,
+      "alpha": 1,
+      "emission": 0
+    },
+    "ExtAmberLED": {
+      "rgb": [
+        0.96,
+        0.314,
+        0.019
+      ],
+      "metallic": 0.05,
+      "roughness": 0.36,
+      "alpha": 1,
+      "emission": 1.8
+    },
+    "ExtPlate": {
+      "rgb": [
+        0.024,
+        0.206,
+        0.143
+      ],
+      "metallic": 0.13,
+      "roughness": 0.38,
+      "alpha": 1,
+      "emission": 0
+    },
+    "HeadlampLens": {
+      "rgb": [
+        0.802,
+        0.878,
+        0.921
+      ],
+      "metallic": 0.42,
+      "roughness": 0.17,
+      "alpha": 1,
+      "emission": 0
+    },
+    "SignalLeft": {
+      "rgb": [
+        0.931,
+        0.313,
+        0.019
+      ],
+      "metallic": 0.14,
+      "roughness": 0.24,
+      "alpha": 1,
+      "emission": 0
+    },
+    "SignalRight": {
+      "rgb": [
+        0.931,
+        0.313,
+        0.019
+      ],
+      "metallic": 0.14,
+      "roughness": 0.24,
+      "alpha": 1,
+      "emission": 0
+    },
+    "TailLens": {
+      "rgb": [
+        0.515,
+        0.032,
+        0.021
+      ],
+      "metallic": 0.14,
+      "roughness": 0.24,
+      "alpha": 1,
+      "emission": 0
+    },
+    "CabGraphite": {
+      "rgb": [
+        0.034,
+        0.044,
+        0.053
+      ],
+      "metallic": 0.06,
+      "roughness": 0.42,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabBlack": {
+      "rgb": [
+        0.011,
+        0.016,
+        0.021
+      ],
+      "metallic": 0.03,
+      "roughness": 0.48,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabWheelGrip": {
+      "rgb": [
+        0.031,
+        0.039,
+        0.042
+      ],
+      "metallic": 0.01,
+      "roughness": 0.6,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabShell": {
+      "rgb": [
+        0.24,
+        0.3,
+        0.32
+      ],
+      "metallic": 0.1,
+      "roughness": 0.4,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabFloor": {
+      "rgb": [
+        0.12,
+        0.15,
+        0.16
+      ],
+      "metallic": 0.02,
+      "roughness": 0.73,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabStone": {
+      "rgb": [
+        0.54,
+        0.56,
+        0.5
+      ],
+      "metallic": 0.02,
+      "roughness": 0.49,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabLight": {
+      "rgb": [
+        0.77,
+        0.78,
+        0.7
+      ],
+      "metallic": 0.01,
+      "roughness": 0.41,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabSilver": {
+      "rgb": [
+        0.45,
+        0.51,
+        0.53
+      ],
+      "metallic": 0.68,
+      "roughness": 0.3,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabWhite": {
+      "rgb": [
+        0.85,
+        0.88,
+        0.82
+      ],
+      "metallic": 0.03,
+      "roughness": 0.36,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabOcean": {
+      "rgb": [
+        0.034,
+        0.125,
+        0.26
+      ],
+      "metallic": 0.02,
+      "roughness": 0.78,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabBlue": {
+      "rgb": [
+        0.085,
+        0.25,
+        0.42
+      ],
+      "metallic": 0.01,
+      "roughness": 0.77,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabWeave": {
+      "rgb": [
+        0.11,
+        0.38,
+        0.51
+      ],
+      "metallic": 0.01,
+      "roughness": 0.67,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabOrange": {
+      "rgb": [
+        0.94,
+        0.36,
+        0.055
+      ],
+      "metallic": 0.03,
+      "roughness": 0.43,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabYellow": {
+      "rgb": [
+        0.9,
+        0.67,
+        0.12
+      ],
+      "metallic": 0.02,
+      "roughness": 0.49,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabRed": {
+      "rgb": [
+        0.68,
+        0.052,
+        0.025
+      ],
+      "metallic": 0.03,
+      "roughness": 0.42,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabGreen": {
+      "rgb": [
+        0.045,
+        0.54,
+        0.28
+      ],
+      "metallic": 0.04,
+      "roughness": 0.39,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabAmber": {
+      "rgb": [
+        0.95,
+        0.44,
+        0.055
+      ],
+      "metallic": 0.02,
+      "roughness": 0.37,
+      "alpha": 1.0,
+      "emission": 0.0
+    },
+    "CabScreen": {
+      "rgb": [
+        0.028,
+        0.086,
+        0.083
+      ],
+      "metallic": 0.12,
+      "roughness": 0.29,
+      "alpha": 1.0,
+      "emission": 0.0
+    }
+  },
+  "bones": {
+    "root": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "wheel_FL": [
+      2.2,
+      0.94,
+      0.39
+    ],
+    "wheel_FR": [
+      2.2,
+      -0.94,
+      0.39
+    ],
+    "wheel_RL": [
+      -2.2,
+      0.94,
+      0.39
+    ],
+    "wheel_RR": [
+      -2.2,
+      -0.94,
+      0.39
+    ],
+    "door_front_A": [
+      3.91,
+      1.138,
+      1.25
+    ],
+    "door_front_B": [
+      3.05,
+      1.138,
+      1.25
+    ],
+    "door_mid_A": [
+      -0.11,
+      1.138,
+      1.25
+    ],
+    "door_mid_B": [
+      -1.25,
+      1.138,
+      1.25
+    ],
+    "wiper_L": [
+      4.34,
+      0.49,
+      1.24
+    ],
+    "wiper_R": [
+      4.34,
+      -0.49,
+      1.24
+    ],
+    "steering": [
+      3.62,
+      -0.66,
+      1.31
+    ],
+    "needle_speed": [
+      3.872,
+      -0.515,
+      1.527
+    ],
+    "needle_rpm": [
+      3.872,
+      -0.805,
+      1.527
+    ],
+    "selector": [
+      3.7,
+      -0.245,
+      1.3
+    ],
+    "pedal_brake": [
+      3.79,
+      -0.675,
+      0.754
+    ],
+    "pedal_throttle": [
+      3.8,
+      -0.86,
+      0.754
+    ],
+    "switch_front": [
+      3.82,
+      -0.15,
+      1.385
+    ],
+    "switch_mid": [
+      3.82,
+      -0.04,
+      1.385
+    ],
+    "switch_park": [
+      3.61,
+      -0.13,
+      1.3
+    ],
+    "switch_lights": [
+      3.91,
+      -0.15,
+      1.42
+    ],
+    "switch_left": [
+      3.71,
+      -0.035,
+      1.33
+    ],
+    "switch_right": [
+      3.71,
+      -0.12,
+      1.33
+    ]
+  }
+}
