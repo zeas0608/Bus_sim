@@ -31,7 +31,8 @@ try {
     if($null -eq $selected){throw 'Bus maps found, but required Blueprints are missing. Stop and share diagnostics; do not reimport over them.'}
     $contentPrefix=(Join-Path $root 'Content') + [IO.Path]::DirectorySeparatorChar
     $relative=$selected.FullName.Substring($contentPrefix.Length)
-    $map='/Game/' + [IO.Path]::ChangeExtension($relative,$null).Replace('\','/')
+    # Epic's command-line docs require the .umap extension for maps outside the Maps folder.
+    $map='/Game/' + $relative.Replace('\','/')
     Write-Host 'Opening the previously imported Kotoden 1086, without Python or build steps.'
     Write-Host "Map: $map"
     Write-Host 'If the Editor closes unexpectedly, run CHECK_1086_ERROR.cmd and send its report.'
