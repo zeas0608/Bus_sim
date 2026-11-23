@@ -1,4 +1,6 @@
 #include "Vehicle/Kotoden1086Pawn.h"
+#include "Vehicle/BusDriveInterlock.h"
+#include "Components/PointLightComponent.h"
 
 #include "Camera/CameraComponent.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
@@ -118,6 +120,18 @@ AKotoden1086Pawn::AKotoden1086Pawn()
     Recorder = CreateDefaultSubobject<UBusTripRecorder>(TEXT("TripRecorder"));
     Display = CreateDefaultSubobject<UKotodenBusDisplay>(TEXT("BusBodyDisplay"));
 
+    FrontEntryLamp = CreateDefaultSubobject<UPointLightComponent>(TEXT("FrontEntryLamp"));
+    MiddleEntryLamp = CreateDefaultSubobject<UPointLightComponent>(TEXT("MiddleEntryLamp"));
+    for (auto* Lamp : {FrontEntryLamp.Get(), MiddleEntryLamp.Get()})
+    {
+        Lamp->SetupAttachment(GetMesh());
+        Lamp->SetRelativeLocation(FVector(Lamp == FrontEntryLamp.Get() ? 348.f : -68.f, -86.f, 246.f));
+        Lamp->SetLightColor(FLinearColor(1.f,.88f,.70f));
+        Lamp->SetIntensity(500.f);
+        Lamp->SetAttenuationRadius(220.f);
+        Lamp->SetCastShadows(false);
+        Lamp->SetVisibility(false);
+    }
     LeftHeadlamp = CreateDefaultSubobject<USpotLightComponent>(TEXT("LeftHeadlamp"));
     RightHeadlamp = CreateDefaultSubobject<USpotLightComponent>(TEXT("RightHeadlamp"));
     for (auto* Lamp : { LeftHeadlamp.Get(), RightHeadlamp.Get() })
@@ -213,15 +227,16 @@ void AKotoden1086Pawn::ApplyDriveAndBrake(const FBusDriverInputState& Input, flo
     DriverSteer = Input.Steering;
     DriverClutch = Input.Clutch;
     bControlFault = Input.bInvalidAxes || !FMath::IsFinite(GetForwardSpeedKmh()) || !FMath::IsFinite(BrakeCommand);
-    AppliedBrake = (bDoorInterlock || bControlFault) ? 1.f : BrakeCommand;
+    const auto Controls = BusDrive::Interlock(bParking, bDoorInterlock, bControlFault, BrakeCommand);
+    AppliedBrake = Controls.ServiceBrake;
     if (Mode != EDriveMode::AT)
     {
-        ApplyManual(Input, GetWorld()->GetDeltaSeconds(), bDoorInterlock || bParking);
+        ApplyManual(Input, GetWorld()->GetDeltaSeconds(), !Controls.DriveAllowed);
         return;
     }
     if (Range == EBusDriveRange::Reverse && M->GetTargetGear() != -1) M->SetTargetGear(-1, true);
     if (Range == EBusDriveRange::Neutral && M->GetTargetGear() != 0) M->SetTargetGear(0, true);
-    const bool bCanDrive = Range != EBusDriveRange::Neutral && !bParking && !bDoorInterlock && !bControlFault;
+    const bool bCanDrive = Range != EBusDriveRange::Neutral && Controls.DriveAllowed;
     M->SetThrottleInput(bCanDrive ? Input.Throttle : 0.f);
     M->SetBrakeInput(AppliedBrake);
     M->SetHandbrakeInput(bParking);
@@ -271,6 +286,8 @@ void AKotoden1086Pawn::Tick(float Dt)
     FrontDoor = FMath::FInterpConstantTo(FrontDoor, bFrontOpen ? 1.f : 0.f, Dt, DoorRate);
     MiddleDoor = FMath::FInterpConstantTo(MiddleDoor, bMiddleOpen ? 1.f : 0.f, Dt, DoorRate);
     const auto* M = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    FrontEntryLamp->SetVisibility(bFrontOpen || FrontDoor > 0.f);
+    MiddleEntryLamp->SetVisibility(bMiddleOpen || MiddleDoor > 0.f);
     Display->PoseWheels(*M);
     Display->PoseCab(DriverSteer, FMath::Abs(GetForwardSpeedKmh()), EngineRPM(),
         FrontDoor, MiddleDoor, DriverThrottle, GetServiceBrakeCommand(), Mode == EDriveMode::AT ? static_cast<int32>(Range) - 1 : 0);

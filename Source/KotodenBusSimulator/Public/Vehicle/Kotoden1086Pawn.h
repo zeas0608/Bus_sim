@@ -11,6 +11,7 @@ class UTextRenderComponent;
 class UBusDriveAudio;
 class UKotodenBusDisplay;
 class USpotLightComponent;
+class UPointLightComponent;
 class USkeletalMesh;
 
 // Provisional vehicle calibration. Wheel, engine and drivetrain settings remain editable in a Blueprint.
@@ -104,6 +105,10 @@ private:
     TObjectPtr<UKotodenBusDisplay> Display;
     UPROPERTY(VisibleAnywhere, Category="Bus")
     TObjectPtr<USpotLightComponent> LeftHeadlamp;
+    UPROPERTY(VisibleAnywhere, Category="Bus")
+    TObjectPtr<UPointLightComponent> FrontEntryLamp;
+    UPROPERTY(VisibleAnywhere, Category="Bus")
+    TObjectPtr<UPointLightComponent> MiddleEntryLamp;
     UPROPERTY(VisibleAnywhere, Category="Bus")
     TObjectPtr<USpotLightComponent> RightHeadlamp;
 

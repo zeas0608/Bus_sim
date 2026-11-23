@@ -1,5 +1,6 @@
 // Compile the production powertrain with a C++17 compiler; see docs/1086-MT.md.
 #include "Vehicle/ManualPowertrain.h"
+#include "Vehicle/BusDriveInterlock.h"
 #include <cassert>
 #include <algorithm>
 #include <cmath>
@@ -29,6 +30,15 @@ static Powertrain launch(int hz)
 }
 int main()
 {
+    // AT gets native throttle/brake/handbrake; MT uses the same physical interlock.
+    for (bool park : {false,true})
+        for (bool door : {false,true})
+            for (bool fault : {false,true})
+            {
+                const auto out = BusDrive::Interlock(park,door,fault,.42f);
+                assert(out.DriveAllowed == (!park && !door && !fault));
+                assert(out.ServiceBrake == ((door || fault) ? 1.f : .42f));
+            }
     auto p = launch(60); const auto p30 = launch(30);
     assert(std::abs(p.Rpm-p30.Rpm)<.01f && std::abs(p.AxleNm-p30.AxleNm)<.1f);
     Input i; i.Pedal = 1; run(p,i,1); assert(p.AxleNm == 0);
