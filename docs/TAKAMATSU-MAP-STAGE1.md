@@ -52,6 +52,10 @@
 
 ## Windowsでの導入と実走確認
 
+**この工程はユーザーのWindowsで一度に検証する。** ローカルの既存1086車両、試走場、個人アセットはバージョン管理外にある。GitHub Desktopが変更破棄・上書きを提案した場合は**Discardを選択しない**。前回の更新で作られた外部 `Recovery_Backup` が残っていることを確認する。マップインストーラーは、不足している1086アセットだけを外部バックアップから回収し（既存は上書きしない）、さらに **初回インストール時に1086 ContentとConfigの外部バックアップを作ってSHA-256で一致確認**する。Gitブランチ切替前のバックアップを置き換えるものではない。
+
+一度の実機試験では、**①新規地図のタブ表示 ②AT前進・旋回・停止 ③完全MT半クラッチ発進・2速 ④自動クラッチMT発進 ⑤旧L_1086_DriveのAT走行 ⑥駅前の停車位置と進行方向 ⑦概要図・経路出典/欠測/フレームレート**まで確認する。エラー時は **`scripts/INSTALL_TAKAMATSU_STAGE1.cmd` が自動で診断レポートを開く**。成功後の不具合・位置ずれは `scripts/CHECK_TAKAMATSU_STAGE1.cmd` を一度ダブルクリックし、表示された `Saved/TakamatsuStage1/Stage1-Diagnostics.txt` とマップ画像を送る。UE上での運転操作は自動化されていないため、F310実走のみユーザーが行う。
+
 1. 動作確認済みの1086号車があるプロジェクトでUEを保存して終了する。GitHub Desktopの **Current branch → feature/takamatsu-map-stage1** を選び、**Fetch origin → Pull origin**。**Repository → Show in Explorer** でその作業フォルダーを開く。
 2. **scripts → INSTALL_TAKAMATSU_STAGE1.cmd** をダブルクリックする。初回はインターネットに接続する。公式GTFS・OSMの照合、標高と建物データの取得、Development Editorのビルド、新規マップの生成が順に進む。UEが一度閉じてから通常のエディターが開く。**Blueprintの手動編集・車体の配置は不要**。
 3. エディターのタブに **L_TakamatsuStation47** と表示されることを確認する。上部の **Play** の隣の **⋮ → Selected Viewport** を選び、**Play**。ゲーム画面をクリックする。マップにはPlayerStartが1つあり、レベルのGameModeが既存の1086号車をスポーンする。
@@ -61,7 +65,7 @@
 
 新しいアセットは `Content/TakamatsuRoute/Stage01/Build_<ID>` に保存する。データと生成コード・使用車両が同じときは前回のレベルを開き、変更や必要なパッケージの欠落があれば新規フォルダーを使う。中断時のフォルダーも上書きしない。初回のUE生成では、新しいレベルを再ロードしてGameModeを読み戻し、4輪の位置で道路メッシュにレイが当たることを検査する。
 
-**失敗した場合**は `Saved/TakamatsuStage1/Runs/<ID>/install.log` を開く。UE生成段階では同じフォルダーに `UnrealImport.log` と `result.json` がある。通信エラーではログのURLと入力ファイル名を確認する。正規の入力ファイルを `Inputs` に置いて再実行できる。⑤付近の道路・進行方向・車体の収まりが資料と一致しない場合はエラー内容と入力を保持する。UEのインストール先が標準外ならPowerShellで次を実行する。
+**失敗した場合**は診断レポート `Saved/TakamatsuStage1/Stage1-Diagnostics.txt` が自動で開くので、その1ファイルを共有する。必要なら `Saved/TakamatsuStage1/Runs/<ID>/install.log` と同フォルダーの `UnrealImport.log`、`result.json` を参照する。通信エラーではログのURLと入力ファイル名を確認する。正規の入力ファイルを `Inputs` に置いて再実行できる。⑤付近の道路・進行方向・車体の収まりが資料と一致しない場合はエラー内容と入力を保持する。UEのインストール先が標準外ならPowerShellで次を実行する。
 
 ```powershell
 .\scripts\install_takamatsu_stage1.ps1 -UnrealRoot 'D:\Epic\UE_5.5'
