@@ -337,9 +337,9 @@ void AKotoden1086Pawn::SetCabCursor(bool bEnabled)
         PC->bShowMouseCursor = bEnabled;
         if (bEnabled)
         {
-            FInputModeGameAndUI Mode;
-            Mode.SetHideCursorDuringCapture(false);
-            PC->SetInputMode(Mode);
+            FInputModeGameAndUI InputMode;
+            InputMode.SetHideCursorDuringCapture(false);
+            PC->SetInputMode(InputMode);
         }
         else PC->SetInputMode(FInputModeGameOnly());
     }
