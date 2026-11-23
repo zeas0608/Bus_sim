@@ -89,7 +89,7 @@ try {
         $maps = @(Get-ChildItem -LiteralPath $busContent -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue)
         if ($maps.Count -gt 0) {
             Write-Host "Found previously imported bus level(s). Skipping project generation, build and Python import."
-            & (Join-Path $PSScriptRoot 'open_kotoden1086.ps1') -UnrealRoot $UnrealRoot
+            & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'open_kotoden1086.ps1') -UnrealRoot $UnrealRoot
             if ($LASTEXITCODE -ne 0) {
                 throw 'Could not open the existing bus map. Use CHECK_1086_ERROR.cmd; do not reimport.'
             }
