@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Vector
 
 
 class Builder:
@@ -108,7 +108,7 @@ class Builder:
     def cyl(self, name, a, b, radius, mat, bone="root", sides=24):
         return self.tube(name, [a, b], radius, mat, bone, sides)
 
-    def bind(self):
+    def make_skeleton(self, units_per_metre):
         data = bpy.data.armatures.new("1086 skeleton")
         arm = bpy.data.objects.new("Armature", data)
         bpy.context.scene.collection.objects.link(arm)
@@ -117,12 +117,16 @@ class Builder:
         bpy.ops.object.mode_set(mode="EDIT")
         for name, p in self.bones.items():
             bone = data.edit_bones.new(name)
-            bone.head = p
-            bone.tail = Vector(p) + Vector((0, .12, 0))
+            bone.head = Vector(p) * units_per_metre
+            bone.tail = (Vector(p) + Vector((0, .12, 0))) * units_per_metre
             if name != "root":
                 bone.parent = data.edit_bones["root"]
         bpy.ops.object.mode_set(mode="OBJECT")
         arm.display_type = "WIRE"
+        return arm
+
+    def bind(self):
+        arm = self.make_skeleton(1.0)
         for obj, name in self.parts:
             if name not in self.bones:
                 raise ValueError(f"Unknown bone {name} on {obj.name}")
@@ -170,7 +174,9 @@ def export_fbx(h, arm, path):
         evaluated.to_mesh_clear()
     for obj, _ in h.parts:
         bpy.data.objects.remove(obj, do_unlink=True)
-    arm.data.transform(Matrix.Scale(100, 4))
+    # Rebuild in cm so bind transforms and default pose both use the FBX units.
+    bpy.data.objects.remove(arm, do_unlink=True)
+    arm = h.make_skeleton(100.0)
     for bone, (verts, faces, indices, smooth) in groups.items():
         data = bpy.data.meshes.new(bone + "_skin")
         data.from_pydata(verts, [], faces)
@@ -187,6 +193,7 @@ def export_fbx(h, arm, path):
         obj.vertex_groups.new(name=bone).add(list(range(len(verts))), 1.0, "REPLACE")
         obj.modifiers.new("Skeleton", "ARMATURE").object = arm
     bpy.context.scene.unit_settings.scale_length = .01
+    bpy.context.view_layer.update()
     bpy.ops.export_scene.fbx(filepath=str(path), object_types={"ARMATURE","MESH"},
                              axis_forward="Y", axis_up="Z", add_leaf_bones=False,
                              apply_unit_scale=True, use_mesh_modifiers=False,
