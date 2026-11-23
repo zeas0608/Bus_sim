@@ -6,6 +6,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Engine/World.h"
+#include "Misc/ConfigCacheIni.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Input/BusInputPlayerController.h"
@@ -134,6 +136,18 @@ void AKotoden1086Pawn::PreRegisterAllComponents()
 void AKotoden1086Pawn::BeginPlay()
 {
     Super::BeginPlay();
+    const TCHAR* Section = TEXT("Kotoden1086.VirtualMT");
+    auto& Config = Manual.Setup;
+    for (int32 I = 0; I < 6; ++I)
+        GConfig->GetFloat(Section, *FString::Printf(TEXT("Gear%d"), I + 1), Config.Forward[I], GGameIni);
+    GConfig->GetFloat(Section, TEXT("Reverse"), Config.Reverse, GGameIni);
+    GConfig->GetFloat(Section, TEXT("FinalDrive"), Config.FinalDrive, GGameIni);
+    GConfig->GetFloat(Section, TEXT("Inertia"), Config.Inertia, GGameIni);
+    GConfig->GetFloat(Section, TEXT("PeakNm"), Config.PeakNm, GGameIni);
+    GConfig->GetFloat(Section, TEXT("CapacityNm"), Config.CapacityNm, GGameIni);
+    GConfig->GetFloat(Section, TEXT("Coupling"), Config.Coupling, GGameIni);
+    GConfig->GetFloat(Section, TEXT("IdleRPM"), Config.IdleRPM, GGameIni);
+    GConfig->GetFloat(Section, TEXT("LimitRPM"), Config.LimitRPM, GGameIni);
     Display->Initialize(*GetMesh());
     if (auto* Arm = FindComponentByClass<USpringArmComponent>())
     {
@@ -149,6 +163,8 @@ void AKotoden1086Pawn::BeginPlay()
 void AKotoden1086Pawn::SetupPlayerInputComponent(UInputComponent* IC)
 {
     Super::SetupPlayerInputComponent(IC);
+    IC->BindKey(EKeys::T, IE_Pressed, this, &AKotoden1086Pawn::CycleMode);
+    IC->BindKey(EKeys::I, IE_Pressed, this, &AKotoden1086Pawn::Ignition);
     IC->BindKey(EKeys::C, IE_Pressed, this, &AKotoden1086Pawn::ToggleCamera);
     IC->BindKey(EKeys::SpaceBar, IE_Pressed, this, &AKotoden1086Pawn::ToggleParking);
     IC->BindKey(EKeys::F, IE_Pressed, this, &AKotoden1086Pawn::ToggleFrontDoor);
@@ -164,7 +180,7 @@ void AKotoden1086Pawn::SetupPlayerInputComponent(UInputComponent* IC)
 
 void AKotoden1086Pawn::SelectRange(EBusDriveRange NewRange)
 {
-    if (FMath::Abs(GetForwardSpeedKmh()) > StationaryKmh || NewRange == Range) return;
+    if (Mode != EDriveMode::AT || FMath::Abs(GetForwardSpeedKmh()) > StationaryKmh || NewRange == Range) return;
     Range = NewRange;
     auto* M = GetVehicleMovementComponent();
     M->SetUseAutomaticGears(Range == EBusDriveRange::Drive);
@@ -177,11 +193,17 @@ void AKotoden1086Pawn::ApplyDriveAndBrake(const FBusDriverInputState& Input, flo
     const bool bDoorInterlock = bFrontOpen || bMiddleOpen || FrontDoor > 0.001f || MiddleDoor > 0.001f;
     DriverThrottle = Input.Throttle;
     DriverSteer = Input.Steering;
+    DriverClutch = Input.Clutch;
+    AppliedBrake = bDoorInterlock ? 1.f : BrakeCommand;
+    if (Mode != EDriveMode::AT)
+    {
+        ApplyManual(Input, GetWorld()->GetDeltaSeconds(), bDoorInterlock || bParking);
+        return;
+    }
     if (Range == EBusDriveRange::Reverse && M->GetTargetGear() != -1) M->SetTargetGear(-1, true);
     if (Range == EBusDriveRange::Neutral && M->GetTargetGear() != 0) M->SetTargetGear(0, true);
     const bool bCanDrive = Range != EBusDriveRange::Neutral && !bParking && !bDoorInterlock;
     M->SetThrottleInput(bCanDrive ? Input.Throttle : 0.f);
-    AppliedBrake = bDoorInterlock ? 1.f : BrakeCommand;
     M->SetBrakeInput(AppliedBrake);
     M->SetHandbrakeInput(bParking);
 }
@@ -229,8 +251,8 @@ void AKotoden1086Pawn::Tick(float Dt)
     MiddleDoor = FMath::FInterpConstantTo(MiddleDoor, bMiddleOpen ? 1.f : 0.f, Dt, DoorRate);
     const auto* M = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
     Display->PoseWheels(*M);
-    Display->PoseCab(DriverSteer, FMath::Abs(GetForwardSpeedKmh()), M->GetEngineRotationSpeed(),
-        FrontDoor, MiddleDoor, DriverThrottle, GetServiceBrakeCommand(), static_cast<int32>(Range) - 1);
+    Display->PoseCab(DriverSteer, FMath::Abs(GetForwardSpeedKmh()), EngineRPM(),
+        FrontDoor, MiddleDoor, DriverThrottle, GetServiceBrakeCommand(), Mode == EDriveMode::AT ? static_cast<int32>(Range) - 1 : 0);
     const float Period = FMath::Max(0.1f, SignalPeriodSeconds);
     SignalTime = FMath::Fmod(SignalTime + Dt, Period);
     const bool bFlash = SignalTime < Period * 0.5f;
@@ -280,6 +302,9 @@ void AKotoden1086Pawn::PawnClientRestart()
 
 void AKotoden1086Pawn::UnPossessed()
 {
+    ReleaseOverride();
+    Mode = EDriveMode::AT;
+    Manual.Reset();
     SetCabCursor(false);
     Range = EBusDriveRange::Neutral;
     DriverSteer = 0.f;
@@ -331,8 +356,131 @@ FString AKotoden1086Pawn::GetStatusText() const
     const TCHAR* RangeName = Range == EBusDriveRange::Drive ? TEXT("D") : (Range == EBusDriveRange::Reverse ? TEXT("R") : TEXT("N"));
     const auto* M = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
     const TCHAR* Turn = SignalDirection < 0 ? TEXT("left") : (SignalDirection > 0 ? TEXT("right") : TEXT("off"));
-    return FString::Printf(TEXT("1086   %s  gear %d   %.0f km/h   %.0f rpm   Park %s   Doors %.0f/%.0f%%   Lights %s   Turn %s"),
+    if (Mode != EDriveMode::AT)
+    {
+        const TCHAR* Engines[] = {TEXT("Off"), TEXT("Starting"), TEXT("Running"), TEXT("STALLED")};
+        const TCHAR* Reasons[] = {TEXT(""), TEXT("one button only"), TEXT("depress LT"), TEXT("stop before reverse"), TEXT("over-rev"), TEXT("gear limit")};
+        const FString Gear = Manual.Gear < 0 ? TEXT("R") : Manual.Gear == 0 ? TEXT("N") : FString::FromInt(Manual.Gear);
+        return FString::Printf(TEXT("%s   %s   %s   %.0f rpm   %.1f km/h   Park %s   Doors %.0f/%.0f%%\nLT %.2f   engagement %.2f   slip %+.0f rpm   axle %+.0f Nm   %s %s %s"),
+            ModeLabel(), *Gear, Engines[static_cast<int>(Manual.State)], Manual.Rpm, GetForwardSpeedKmh(),
+            bParking ? TEXT("ON") : TEXT("OFF"), 100.f*FrontDoor, 100.f*MiddleDoor, DriverClutch,
+            Manual.Engagement, Manual.SlipRPM, Manual.AxleNm, Reasons[static_cast<int>(Manual.LastShift)],
+            (Manual.Fault || bWheelFault) ? TEXT("INPUT/WHEEL FAULT") : TEXT(""), *ModeNotice);
+    }
+    return FString::Printf(TEXT("AT (1086)   %s  gear %d   %.0f km/h   %.0f rpm   Park %s   Doors %.0f/%.0f%%   Lights %s   Turn %s   %s"),
         RangeName, M->GetCurrentGear(), FMath::Abs(GetForwardSpeedKmh()), M->GetEngineRotationSpeed(),
         bParking ? TEXT("ON") : TEXT("OFF"), 100.f * FrontDoor, 100.f * MiddleDoor,
-        bLamps ? TEXT("ON") : TEXT("OFF"), Turn);
+        bLamps ? TEXT("ON") : TEXT("OFF"), Turn, *ModeNotice);
+}
+
+const TCHAR* AKotoden1086Pawn::ModeLabel() const
+{
+    if (Mode == EDriveMode::AT) return TEXT("AT (1086)");
+    return Mode == EDriveMode::Manual ? TEXT("Manual MT (fictional)") : TEXT("Auto-clutch MT (fictional)");
+}
+
+float AKotoden1086Pawn::EngineRPM() const
+{
+    const auto* M = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    return Mode == EDriveMode::AT ? M->GetEngineRotationSpeed() : Manual.Rpm;
+}
+
+int32 AKotoden1086Pawn::DisplayGear() const
+{
+    return Mode == EDriveMode::AT ? GetVehicleMovementComponent()->GetCurrentGear() : Manual.Gear;
+}
+
+void AKotoden1086Pawn::CycleMode()
+{
+    if (!bParking || !FMath::IsFinite(GetForwardSpeedKmh()) || FMath::Abs(GetForwardSpeedKmh()) > StationaryKmh)
+    {
+        ModeNotice = TEXT("T: stop and apply Park");
+        return;
+    }
+    auto* M = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    if (M->GetNumWheels() != 4 || M->Wheels.Num() != 4) { ModeNotice = TEXT("waiting for four wheels"); return; }
+    ModeNotice.Empty();
+    // Keep the proven chassis alive. Native drivetrain is neutral and receives zero throttle
+    // throughout MT. Override replaces BOTH torques on every wheel at the final Chaos stage.
+    M->SetThrottleInput(0.f);
+    M->SetUseAutomaticGears(false);
+    M->SetTargetGear(0, true);
+    Range = EBusDriveRange::Neutral;
+    const auto Next = Mode == EDriveMode::AT ? EDriveMode::Manual :
+        Mode == EDriveMode::Manual ? EDriveMode::AutoClutch : EDriveMode::AT;
+    if (Next == EDriveMode::AT) ReleaseOverride();
+    Mode = Next;
+    Manual.Reset();
+    if (const auto* Driver = Cast<ABusInputPlayerController>(GetController()))
+    {
+        const auto Input = Driver->GetDriverInputState();
+        Manual.SynchronizeButtons(Input.bGearUpHeld, Input.bGearDownHeld);
+        if (Mode != EDriveMode::AT) ApplyManual(Input, 0, true);
+    }
+}
+
+void AKotoden1086Pawn::Ignition()
+{
+    if (Mode == EDriveMode::AT) return;
+    if (!bParking || FMath::Abs(GetForwardSpeedKmh()) > StationaryKmh || Manual.Gear != 0)
+    {
+        ModeNotice = TEXT("I: stop, Park and select N");
+        return;
+    }
+    ModeNotice.Empty();
+    Manual.Ignition();
+}
+
+void AKotoden1086Pawn::ApplyManual(const FBusDriverInputState& Input, float Dt, bool bInterlock)
+{
+    auto& M = *CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    BusMT::Input In;
+    In.Throttle = Input.Throttle;
+    In.Pedal = Input.Clutch;
+    In.SpeedMS = GetForwardSpeedKmh() / 3.6f;
+    In.Interlock = bInterlock;
+    In.AutomaticClutch = Mode == EDriveMode::AutoClutch;
+    In.Up = Input.bGearUpHeld;
+    In.Down = Input.bGearDownHeld;
+    bWheelFault = M.Wheels.Num() != 4 || M.GetNumWheels() != 4 || !FMath::IsFinite(AppliedBrake);
+    for (int32 I = 0; I < M.GetNumWheels(); ++I)
+    {
+        if (!M.Wheels.IsValidIndex(I) || !M.Wheels[I] || !M.GetWheelState(I).bIsValid)
+        { bWheelFault = true; continue; }
+        const auto& State = M.GetWheelState(I);
+        if (!FMath::IsFinite(State.DriveTorque) || !FMath::IsFinite(State.BrakeTorque)) bWheelFault = true;
+        if (I == 2 || I == 3) In.AxleRadS += .5f * M.Wheels[I]->GetWheelAngularVelocity();
+    }
+    In.Interlock |= bWheelFault;
+    Manual.Advance(Dt, In);
+    for (int32 I = 0; I < M.GetNumWheels(); ++I)
+    {
+        const auto* Wheel = M.Wheels.IsValidIndex(I) ? M.Wheels[I].Get() : nullptr;
+        float Brake = Wheel && FMath::IsFinite(AppliedBrake) ? AppliedBrake * Wheel->MaxBrakeTorque : 0.f;
+        if (Wheel && bParking && I >= 2) Brake = FMath::Max(Brake, Wheel->MaxHandBrakeTorque);
+        Brake = FMath::IsFinite(Brake) ? FMath::Max(Brake, 0.f) : 0.f;
+        if (I < 4) BrakeNm[I] = Brake;
+        M.SetDriveTorque(I >= 2 && !bWheelFault ? Manual.AxleNm*.5f : 0.f, I);
+        M.SetBrakeTorque(Brake, I);
+        M.SetTorqueCombineMethod(ETorqueCombineMethod::Override, I);
+    }
+}
+
+void AKotoden1086Pawn::ReleaseOverride()
+{
+    if (Mode == EDriveMode::AT) return;
+    auto& M = *CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
+    for (int32 I = 0; I < M.GetNumWheels(); ++I)
+    {
+        M.SetDriveTorque(0, I);
+        M.SetBrakeTorque(0, I);
+        M.SetTorqueCombineMethod(ETorqueCombineMethod::None, I);
+    }
+    bWheelFault = false;
+}
+
+void AKotoden1086Pawn::EndPlay(const EEndPlayReason::Type Reason)
+{
+    ReleaseOverride();
+    Super::EndPlay(Reason);
 }

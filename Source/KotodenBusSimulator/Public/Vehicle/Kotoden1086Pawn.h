@@ -2,6 +2,7 @@
 
 #include "Vehicle/BusPrototypeVehiclePawn.h"
 #include "ChaosVehicleWheel.h"
+#include "Vehicle/ManualPowertrain.h"
 #include "Kotoden1086Pawn.generated.h"
 
 class UCameraComponent;
@@ -40,6 +41,7 @@ public:
 
 protected:
     virtual void PreRegisterAllComponents() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -49,6 +51,20 @@ protected:
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 
 private:
+    enum class EDriveMode { AT, Manual, AutoClutch };
+    EDriveMode Mode = EDriveMode::AT;
+    BusMT::Powertrain Manual;
+    float DriverClutch = 0.f;
+    bool bWheelFault = false;
+    FString ModeNotice;
+    float BrakeNm[4]{};
+    void CycleMode();
+    void Ignition();
+    void ApplyManual(const FBusDriverInputState& Input, float Dt, bool bInterlock);
+    void ReleaseOverride();
+    float EngineRPM() const;
+    int32 DisplayGear() const;
+    const TCHAR* ModeLabel() const;
     void SelectRange(EBusDriveRange NewRange);
     void SelectDrive() { SelectRange(EBusDriveRange::Drive); }
     void SelectNeutral() { SelectRange(EBusDriveRange::Neutral); }
