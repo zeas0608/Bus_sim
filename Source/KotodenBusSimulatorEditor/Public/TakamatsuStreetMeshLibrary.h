@@ -3,6 +3,7 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "TakamatsuStreetMeshLibrary.generated.h"
 
+class AActor;
 class UMaterialInterface;
 class UStaticMesh;
 
@@ -16,4 +17,8 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Takamatsu|Import")
     static UStaticMesh* CreateStreetMesh(const FString& PackageName, const TArray<FVector>& Vertices,
         const TArray<int32>& Triangles, UMaterialInterface* Material, bool bGroundCollision);
+
+    /** Verify that simple wheel queries hit the saved street at all four 1086 wheel positions. */
+    UFUNCTION(BlueprintCallable, Category = "Takamatsu|Import")
+    static bool CheckDepartureGround(AActor* PlayerStart, UStaticMesh* Asphalt);
 };

@@ -38,3 +38,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local street meshes/levels generated from the user's geographic data snapshots
+/Content/TakamatsuRoute/Stage01/Build_*/

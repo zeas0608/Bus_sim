@@ -2,6 +2,9 @@
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "Components/StaticMeshComponent.h"
+#include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/PackageName.h"
@@ -72,4 +75,34 @@ UStaticMesh* UTakamatsuStreetMeshLibrary::CreateStreetMesh(const FString& Packag
     FAssetRegistryModule::AssetCreated(Mesh);
     Mesh->MarkPackageDirty();
     return Mesh;
+}
+
+bool UTakamatsuStreetMeshLibrary::CheckDepartureGround(AActor* PlayerStart, UStaticMesh* Asphalt)
+{
+    if (!PlayerStart || !Asphalt || !PlayerStart->GetWorld())
+    {
+        return false;
+    }
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(PlayerStart);
+    // The current 1086 rig has a 4.40 m wheelbase and 1.88 m track.
+    for (const float X : {-220.0f, 220.0f})
+    {
+        for (const float Y : {-94.0f, 94.0f})
+        {
+            const FVector From = PlayerStart->GetActorTransform().TransformPosition(FVector(X, Y, 50));
+            FHitResult Hit;
+            if (!PlayerStart->GetWorld()->LineTraceSingleByChannel(Hit, From, From - FVector(0, 0, 400),
+                ECC_Visibility, QueryParams))
+            {
+                return false;
+            }
+            const UStaticMeshComponent* Ground = Cast<UStaticMeshComponent>(Hit.GetComponent());
+            if (!Ground || Ground->GetStaticMesh() != Asphalt)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
 }

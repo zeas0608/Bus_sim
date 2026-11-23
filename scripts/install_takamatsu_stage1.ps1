@@ -15,7 +15,6 @@ $source = Join-Path $projectRoot 'Maps\TakamatsuStage1'
 $deps = Join-Path $saved 'Python311-Shapely212'
 $mutex = New-Object System.Threading.Mutex($false,'Kotoden1086Setup')
 $locked = $false
-$oldPythonPath = $env:PYTHONPATH
 $transcript = $false
 try {
     Start-Transcript -Path (Join-Path $run 'install.log') | Out-Null
@@ -31,31 +30,32 @@ try {
     $bus = Find-1086Level (Join-Path $projectRoot 'Content\Kotoden1086')
     if ($null -eq $bus) { throw 'No complete local 1086 installation. Restore your existing Content or run UPGRADE_KOTODEN1086.cmd once.' }
     if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "Missing UE bundled Python: $python" }
-    $env:PYTHONPATH = $deps
-    & $python -c "import sys, shapely, numpy; assert sys.version_info[:2]==(3,11) and shapely.__version__=='2.1.2' and numpy.__version__=='1.26.4'" 2>$null
+    # PowerShell 5.1 can strip quotes inside native -c arguments. Use a checked-in Python entry point.
+    $runner = Join-Path $source 'windows_python.py'
+    & $python -I $runner $deps --probe
     if ($LASTEXITCODE -ne 0) {
-        if ($Offline) { throw "Install Python wheels online once before requesting offline mode." }
-        # Publish dependencies only after pip succeeds. Failed downloads never poison a working installation.
+        if ($Offline) { throw 'Install the pinned wheels online once before requesting offline mode.' }
         $tempDeps = Join-Path $run 'wheels'
-        & $python -m pip install --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes --target $tempDeps -r (Join-Path $source 'requirements-win64.txt')
+        & $python -I -m pip install --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes --target $tempDeps -r (Join-Path $source 'requirements-win64.txt')
         if ($LASTEXITCODE -ne 0) { throw 'Installing the pinned Windows wheels failed.' }
         if (-not (Test-Path -LiteralPath $deps)) { Move-Item -LiteralPath $tempDeps -Destination $deps }
-        else { $env:PYTHONPATH = $tempDeps }
+        else { $deps = $tempDeps }
+        & $python -I $runner $deps --probe
+        if ($LASTEXITCODE -ne 0) { throw 'Bundled Python cannot load the map dependencies.' }
     }
-    $params = @((Join-Path $source 'prepare.py'),'--saved',$saved)
+    $params = @('-I',$runner,$deps,'--saved',$saved)
     if ($Offline) { $params += '--offline' }
     & $python @params
     if ($LASTEXITCODE -ne 0) { throw 'Map source verification failed. See the URL and Inputs filename above.' }
-    $env:PYTHONPATH = $oldPythonPath
     & $build KotodenBusSimulatorEditor Win64 Development "-Project=$project" -WaitMutex
     if ($LASTEXITCODE -ne 0) { throw 'Editor build failed.' }
 
-    $plan = Join-Path $saved 'plan.json'
+    $geometryKey = (Get-Content -LiteralPath (Join-Path $saved 'geometry.sha256') -Raw).Trim()
     $importer = Join-Path $PSScriptRoot 'import_takamatsu_stage1.py'
     $env:KOTODEN_STAGE_BUS = '/Game/Kotoden1086/' + $bus.Directory.Name
     $env:KOTODEN_STAGE_RUN = $run
     $index = Join-Path $saved 'installed.json'
-    $key = ((Get-FileHash -LiteralPath $plan).Hash + (Get-FileHash -LiteralPath $importer).Hash +
+    $key = ($geometryKey + (Get-FileHash -LiteralPath $importer).Hash +
         (Get-FileHash -LiteralPath (Join-Path $projectRoot 'Source\KotodenBusSimulatorEditor\Private\TakamatsuStreetMeshLibrary.cpp')).Hash +
         $env:KOTODEN_STAGE_BUS)
     $level = $null
@@ -63,7 +63,11 @@ try {
         $previous = Get-Content -LiteralPath $index -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($previous.key -eq $key -and $previous.level -match '^/Game/TakamatsuRoute/Stage01/Build_[a-f0-9]{32}/L_TakamatsuStation47$') {
             $disk = Join-Path (Join-Path $projectRoot 'Content') ($previous.level.Substring(6)+'.umap')
-            if (Test-Path -LiteralPath $disk -PathType Leaf) { $level = $previous.level }
+            $missing = @($previous.layers | Where-Object {
+                -not (Test-Path -LiteralPath (Join-Path (Split-Path $disk -Parent) ("SM_" + $_ + ".uasset")) -PathType Leaf) -or
+                -not (Test-Path -LiteralPath (Join-Path (Split-Path $disk -Parent) ("M_" + $_ + ".uasset")) -PathType Leaf)
+            })
+            if ((Test-Path -LiteralPath $disk -PathType Leaf) -and $missing.Count -eq 0) { $level = $previous.level }
         }
     }
     if (-not $level) {
@@ -75,7 +79,7 @@ try {
         if ($report.status -ne 'ok') { throw $report.error }
         if ($report.level -ne "/Game/TakamatsuRoute/Stage01/Build_$revision/L_TakamatsuStation47") { throw 'Unexpected generated level name.' }
         $level = $report.level
-        @{key=$key;level=$level} | ConvertTo-Json | Set-Content -LiteralPath $index -Encoding UTF8
+        @{key=$key;level=$level;layers=$report.layers} | ConvertTo-Json | Set-Content -LiteralPath $index -Encoding UTF8
     }
     Write-Host "Opening $level. Press Play in Selected Viewport."
     Start-Process -FilePath $editor -WorkingDirectory $projectRoot -ArgumentList @(('"{0}"' -f $project),('"{0}.umap"' -f $level),'-log') | Out-Null
@@ -84,7 +88,6 @@ try {
     Write-Host "Log folder: $run"
     exit 1
 } finally {
-    $env:PYTHONPATH = $oldPythonPath
     if ($locked) { $mutex.ReleaseMutex() }
     $mutex.Dispose()
     if ($transcript) { Stop-Transcript | Out-Null }
