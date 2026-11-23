@@ -4,6 +4,10 @@
 
 **最終目標:** ことでんバスをモデルに、高松駅発の御厩線を実在道路に近い高松市の3Dマップ上で運転する。
 
+## 高松駅・御厩線47番のマップを開く
+
+UEを閉じ、GitHub Desktopで `feature/takamatsu-map-stage1` をPullし、`scripts/INSTALL_TAKAMATSU_STAGE1.cmd` をダブルクリックする。導入済みの1086号車を使用し、駅前のデータから新しいレベルを生成する。Windowsでのビルドと走行は検証待ち。[導入・試走・失敗時の確認方法](docs/TAKAMATSU-MAP-STAGE1.md#windowsでの導入と実走確認)
+
 ## 1086号車を更新して運転する
 
 UEを終了し、GitHub Desktopで `feature/1086-mt-driving` を取得して **scripts/UPGRADE_KOTODEN1086.cmd** をダブルクリックする。バックアップとビルドが終わったら、開いた試走場で **Play**。起動時は6速AT。停車・駐車ブレーキONで **T** を押すと、同じ1086号車の完全MTと自動クラッチMTを選べる。MTはゲーム独自の訓練装備。[発進・再始動・記録・AT回帰の手順](docs/1086-MT.md)
