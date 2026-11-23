@@ -4,7 +4,17 @@
 
 **最終目標:** ことでんバスをモデルに、高松駅発の御厩線を実在道路に近い高松市の3Dマップ上で運転する。
 
-**最初の目標:** Unreal Engine 5で、仮バスとテストコースを使い、Logicool F310で完全MT・クラッチ自動MTを運転できる状態を作る。
+## 高松210あ1086を開く
+
+現在の対象は2024年導入の日野レインボー（2KG-KR290J5、6速AT）。水色の車体、前・中扉、右ハンドルの運転席、客席を持つ独自モデルを収録した。
+
+![高松210あ1086をもとに制作したモデルの外観](Art/Bus1086/preview/exterior.jpg)
+
+- **車体を見たい場合**　Blenderで [Bus1086.blend](Art/Bus1086/Bus1086.blend) を開く。[運転席](Art/Bus1086/preview/cockpit.jpg) と [客室](Art/Bus1086/preview/cabin.jpg) のレンダリング、[モデルの構造と再生成手順](Art/Bus1086/README.md) も参照できる。
+- **Windowsで運転する場合**　UE 5.5.4、VS 2022、F310のXInputモードを使用する。[初回ビルド・自動インポート・試走レベルの作成](docs/1086-UE-SETUP.md) を行い、[発進操作と車両設定](docs/1086-DRIVING.md) に進む。付属FBXを使えるためBlenderのインストールは任意。
+- **検証状況**　Blenderでモデルを生成し、外観・内装をレンダリングした。1086号のUEビルド・インポート・実走行、F310操作、720pの性能は未検証。実車と照合できていない外形・塗装・運転台配置・走行定数は [実車資料と推定の記録](docs/1086-REFERENCES.md) に記載した。
+
+以下のP0技術検証は既存の試験車とローカルレベルで引き続き利用できる。
 
 ## 開発環境
 
@@ -21,7 +31,7 @@
 4. 生成された `KotodenBusSimulator.sln` を Visual Studio で開き、`Development Editor` / `Win64` を選択して `KotodenBusSimulator` プロジェクトをビルドする。ビルドが成功したら `KotodenBusSimulator.uproject` をダブルクリックしてエディターを起動する。
 5. エンジン付属の空マップ `Entry` が開くことと、「Edit → Plugins」で Chaos Vehicles と Enhanced Input が有効になっていることを確認する。必要に応じて「Play」で空マップの実行開始・停止を確認する。
 
-使用するプラグインは UE 5.5.4 に同梱の Chaos Vehicles と Enhanced Input。P0-3 の走行確認には同梱の Vehicle テンプレートから車両アセットを取り込む。UE の利用条件が適用され、有料アセットは不要。
+P0 の走行・入力には UE 5.5.4 に同梱の Chaos Vehicles と Enhanced Input を使用する。P0-3 の走行確認には同梱の Vehicle テンプレートから車両アセットを取り込む。UE の利用条件が適用され、有料アセットは不要。
 
 **P0-1 の検証状況:** ユーザーの Windows 環境（UE 5.5.4、Visual Studio 2022）で C++ ビルドとエディター起動に成功。
 
@@ -67,12 +77,6 @@ P0-4B では試作用 `BusClutchPrototypeVehiclePawn` を追加した。通常�
 - [開発仕様書](docs/SPECIFICATION.md)
 - [ロードマップ](docs/ROADMAP.md)
 - [Codex向けルール](AGENTS.md)
-
-## Codexで最初にやること
-
-`docs/ROADMAP.md` の **P0: 技術スパイク** だけに着手する。UEプロジェクト作成・F310入力表示・Chaos Vehiclesを土台とした独自MTクラッチの接続可能性を確認し、未検証事項を報告する。
-
-最初から実車モデルや高松市マップを作らない。
 
 ## ライセンスと公開について
 
