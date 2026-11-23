@@ -3,6 +3,7 @@
 #include "Camera/CameraComponent.h"
 #include "ChaosWheeledVehicleMovementComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -101,6 +102,16 @@ AKotoden1086Pawn::AKotoden1086Pawn()
     CabCamera->SetRelativeRotation(FRotator(CabPitch, CabYaw, 0));
     CabCamera->FieldOfView = 90.f;
     CabCamera->bAutoActivate = false;
+    // An add-on readout on the console distinguishes the training conversion in existing BPs.
+    TrainingIndicator = CreateDefaultSubobject<UTextRenderComponent>(TEXT("TrainingGearDisplay"));
+    TrainingIndicator->SetupAttachment(GetMesh());
+    TrainingIndicator->SetRelativeLocation(FVector(383.f,22.f,143.f));
+    TrainingIndicator->SetRelativeRotation(FRotator(40.f,180.f,0.f));
+    TrainingIndicator->SetHorizontalAlignment(EHTA_Center);
+    TrainingIndicator->SetWorldSize(2.4f);
+    TrainingIndicator->SetTextRenderColor(FColor(252,211,95));
+    TrainingIndicator->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TrainingIndicator->SetVisibility(false);
     DriveAudio = CreateDefaultSubobject<UBusDriveAudio>(TEXT("DriveAudio"));
     DriveAudio->SetupAttachment(GetMesh());
     DriveAudio->bAutoActivate = false;
@@ -201,7 +212,8 @@ void AKotoden1086Pawn::ApplyDriveAndBrake(const FBusDriverInputState& Input, flo
     DriverThrottle = Input.Throttle;
     DriverSteer = Input.Steering;
     DriverClutch = Input.Clutch;
-    AppliedBrake = bDoorInterlock ? 1.f : BrakeCommand;
+    bControlFault = Input.bInvalidAxes || !FMath::IsFinite(GetForwardSpeedKmh()) || !FMath::IsFinite(BrakeCommand);
+    AppliedBrake = (bDoorInterlock || bControlFault) ? 1.f : BrakeCommand;
     if (Mode != EDriveMode::AT)
     {
         ApplyManual(Input, GetWorld()->GetDeltaSeconds(), bDoorInterlock || bParking);
@@ -209,7 +221,7 @@ void AKotoden1086Pawn::ApplyDriveAndBrake(const FBusDriverInputState& Input, flo
     }
     if (Range == EBusDriveRange::Reverse && M->GetTargetGear() != -1) M->SetTargetGear(-1, true);
     if (Range == EBusDriveRange::Neutral && M->GetTargetGear() != 0) M->SetTargetGear(0, true);
-    const bool bCanDrive = Range != EBusDriveRange::Neutral && !bParking && !bDoorInterlock;
+    const bool bCanDrive = Range != EBusDriveRange::Neutral && !bParking && !bDoorInterlock && !bControlFault;
     M->SetThrottleInput(bCanDrive ? Input.Throttle : 0.f);
     M->SetBrakeInput(AppliedBrake);
     M->SetHandbrakeInput(bParking);
@@ -253,6 +265,7 @@ void AKotoden1086Pawn::SignalRight()
 void AKotoden1086Pawn::Tick(float Dt)
 {
     Super::Tick(Dt);
+    UpdateIndicator();
     if (Recorder->IsRecording()) RecordDrive(Dt);
     const float DoorRate = 1.f / FMath::Max(DoorTravelSeconds, 0.1f);
     FrontDoor = FMath::FInterpConstantTo(FrontDoor, bFrontOpen ? 1.f : 0.f, Dt, DoorRate);
@@ -326,6 +339,7 @@ void AKotoden1086Pawn::UnPossessed()
 {
     ReleaseOverride();
     Mode = EDriveMode::AT;
+    TrainingIndicator->SetVisibility(false);
     Manual.Reset();
     DriveAudio->Stop();
     SetCabCursor(false);
@@ -363,6 +377,7 @@ void AKotoden1086Pawn::ClickCockpit()
     }
     if (Picked == TEXT("selector"))
     {
+        if (Mode != EDriveMode::AT) { ModeNotice = TEXT("training gearbox: LB / RB"); return; }
         SelectRange(Range == EBusDriveRange::Neutral ? EBusDriveRange::Drive :
             (Range == EBusDriveRange::Drive ? EBusDriveRange::Reverse : EBusDriveRange::Neutral));
     }
@@ -378,16 +393,16 @@ FString AKotoden1086Pawn::GetStatusText() const
 {
     const TCHAR* RangeName = Range == EBusDriveRange::Drive ? TEXT("D") : (Range == EBusDriveRange::Reverse ? TEXT("R") : TEXT("N"));
     const auto* M = CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
-    const FString Notice = (Recorder->IsRecording() ? FString(TEXT("REC  ")) : FString()) + ModeNotice;
+    const FString Notice = (bControlFault ? FString(TEXT("INPUT FAULT  ")) : FString()) + (Recorder->IsRecording() ? FString(TEXT("REC  ")) : FString()) + ModeNotice;
     const TCHAR* Turn = SignalDirection < 0 ? TEXT("left") : (SignalDirection > 0 ? TEXT("right") : TEXT("off"));
     if (Mode != EDriveMode::AT)
     {
         const TCHAR* Reasons[] = {TEXT(""), TEXT("one button only"), TEXT("depress LT"), TEXT("stop before reverse"), TEXT("over-rev"), TEXT("gear limit")};
         const FString Gear = Manual.Gear < 0 ? TEXT("R") : Manual.Gear == 0 ? TEXT("N") : FString::FromInt(Manual.Gear);
-        return FString::Printf(TEXT("%s   %s   %s   %.0f rpm   %.1f km/h   Park %s   Doors %.0f/%.0f%%\nLT %.2f   engagement %.2f   slip %+.0f rpm   axle %+.0f Nm   %s %s %s"),
+        return FString::Printf(TEXT("%s   %s   %s   %.0f rpm   %.1f km/h   Park %s   Doors %.0f/%.0f%%\nLT %.2f   engagement %.2f   slip %+.0f rpm   axle %+.0f Nm   lights %s   turn %s   %s %s %s"),
             ModeLabel(), *Gear, EngineLabel(), Manual.Rpm, GetForwardSpeedKmh(),
             bParking ? TEXT("ON") : TEXT("OFF"), 100.f*FrontDoor, 100.f*MiddleDoor, DriverClutch,
-            Manual.Engagement, Manual.SlipRPM, Manual.AxleNm, Reasons[static_cast<int>(Manual.LastShift)],
+            Manual.Engagement, Manual.SlipRPM, Manual.AxleNm, bLamps ? TEXT("on") : TEXT("off"), Turn, Reasons[static_cast<int>(Manual.LastShift)],
             (Manual.Fault || bWheelFault) ? TEXT("INPUT/WHEEL FAULT") : TEXT(""), *Notice);
     }
     return FString::Printf(TEXT("AT (1086)   %s  gear %d   %.0f km/h   %.0f rpm   Park %s   Doors %.0f/%.0f%%   Lights %s   Turn %s   %s"),
@@ -433,6 +448,7 @@ void AKotoden1086Pawn::CycleMode()
         Mode == EDriveMode::Manual ? EDriveMode::AutoClutch : EDriveMode::AT;
     if (Next == EDriveMode::AT) ReleaseOverride();
     Mode = Next;
+    TrainingIndicator->SetVisibility(Mode != EDriveMode::AT);
     Manual.Reset();
     if (const auto* Driver = Cast<ABusInputPlayerController>(GetController()))
     {
@@ -465,7 +481,7 @@ void AKotoden1086Pawn::ApplyManual(const FBusDriverInputState& Input, float Dt, 
     In.AutomaticClutch = Mode == EDriveMode::AutoClutch;
     In.Up = Input.bGearUpHeld;
     In.Down = Input.bGearDownHeld;
-    bWheelFault = M.Wheels.Num() != 4 || M.GetNumWheels() != 4 || !FMath::IsFinite(AppliedBrake);
+    bWheelFault = bControlFault || M.Wheels.Num() != 4 || M.GetNumWheels() != 4 || !FMath::IsFinite(AppliedBrake);
     for (int32 I = 0; I < M.GetNumWheels(); ++I)
     {
         if (!M.Wheels.IsValidIndex(I) || !M.Wheels[I] || !M.GetWheelState(I).bIsValid)
@@ -537,8 +553,12 @@ void AKotoden1086Pawn::RecordDrive(float Dt)
     R.bPark = bParking;
     R.FrontDoor = FrontDoor;
     R.MiddleDoor = MiddleDoor;
+    R.bHeadlights = bLamps;
+    R.Turn = SignalDirection;
+    R.bCab = bCabView;
+    R.YawDeg = GetActorRotation().Yaw;
     R.bManual = Mode != EDriveMode::AT;
-    R.bFault = R.bManual && (Manual.Fault || bWheelFault);
+    R.bFault = bControlFault || (R.bManual && (Manual.Fault || bWheelFault));
     const auto& M = *CastChecked<UChaosWheeledVehicleMovementComponent>(GetVehicleMovementComponent());
     for (int32 I = 0; I < 4; ++I)
     {
@@ -552,4 +572,16 @@ void AKotoden1086Pawn::RecordDrive(float Dt)
         W.Brake = Status.BrakeTorque;
     }
     Recorder->Sample(Dt,R);
+}
+
+void AKotoden1086Pawn::UpdateIndicator()
+{
+    if (Mode == EDriveMode::AT) return;
+    const FString Gear = Manual.Gear < 0 ? TEXT("R") : Manual.Gear == 0 ? TEXT("N") : FString::FromInt(Manual.Gear);
+    const FString Text = (Mode == EDriveMode::Manual ? FString(TEXT("SIM MT  ")) : FString(TEXT("SIM AC  "))) + Gear;
+    if (Text != PreviousIndicator)
+    {
+        TrainingIndicator->SetText(FText::FromString(Text));
+        PreviousIndicator = Text;
+    }
 }

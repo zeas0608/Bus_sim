@@ -7,6 +7,7 @@
 
 class UCameraComponent;
 class UBusTripRecorder;
+class UTextRenderComponent;
 class UBusDriveAudio;
 class UKotodenBusDisplay;
 class USpotLightComponent;
@@ -58,10 +59,15 @@ private:
     BusMT::Powertrain Manual;
     float DriverClutch = 0.f;
     bool bWheelFault = false;
+    bool bControlFault = false;
     FString ModeNotice;
     float BrakeNm[4]{};
     void CycleMode();
     void Ignition();
+    UPROPERTY()
+    TObjectPtr<UTextRenderComponent> TrainingIndicator;
+    FString PreviousIndicator;
+    void UpdateIndicator();
     void ToggleRecording();
     void RecordDrive(float Dt);
     UPROPERTY()

@@ -127,6 +127,7 @@ void ABusInputPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason
 
 float ABusInputPlayerController::NormalizeSignedAxis(float Raw, float DeadZone)
 {
+    if (!FMath::IsFinite(Raw)) return Raw; // Preserve the fault until the next valid event.
     DeadZone = FMath::Clamp(DeadZone, 0.0f, 0.99f);
     const float Clamped = FMath::Clamp(Raw, -1.0f, 1.0f);
     const float Magnitude = FMath::Abs(Clamped);
@@ -139,6 +140,7 @@ float ABusInputPlayerController::NormalizeSignedAxis(float Raw, float DeadZone)
 
 float ABusInputPlayerController::NormalizeTrigger(float Raw, float DeadZone)
 {
+    if (!FMath::IsFinite(Raw)) return Raw; // Preserve the fault until the next valid event.
     DeadZone = FMath::Clamp(DeadZone, 0.0f, 0.99f);
     const float Clamped = FMath::Clamp(Raw, 0.0f, 1.0f);
     return Clamped <= DeadZone ? 0.0f : (Clamped - DeadZone) / (1.0f - DeadZone);
@@ -160,3 +162,16 @@ void ABusInputPlayerController::GearDownPressed(const FInputActionValue&) { Driv
 void ABusInputPlayerController::GearDownReleased(const FInputActionValue&) { DriverInputState.bGearDownHeld = false; }
 void ABusInputPlayerController::GearUpPressed(const FInputActionValue&) { DriverInputState.bGearUpHeld = true; }
 void ABusInputPlayerController::GearUpReleased(const FInputActionValue&) { DriverInputState.bGearUpHeld = false; }
+
+FBusDriverInputState ABusInputPlayerController::GetDriverInputState() const
+{
+    FBusDriverInputState Out = DriverInputState;
+    Out.bInvalidAxes = !FMath::IsFinite(Out.Throttle) || !FMath::IsFinite(Out.Clutch)
+        || !FMath::IsFinite(Out.Steering) || !FMath::IsFinite(Out.RightStickX) || !FMath::IsFinite(Out.RightStickY);
+    if (Out.bInvalidAxes)
+    {
+        Out.Throttle = Out.Steering = Out.RightStickX = Out.RightStickY = 0.f;
+        Out.Clutch = 1.f;
+    }
+    return Out;
+}

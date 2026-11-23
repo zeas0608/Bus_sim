@@ -10,7 +10,9 @@ struct FBusDriveReading
     FString Engine;
     float Rpm, SpeedMS, Clutch, Engagement, SlipRPM, Throttle, Brake, Steer, FrontDoor, MiddleDoor;
     int32 Gear;
-    bool bManual, bPark, bFault;
+    bool bManual, bPark, bFault, bHeadlights, bCab;
+    int32 Turn;
+    float YawDeg;
     struct FWheelReading
     {
         bool bValid;

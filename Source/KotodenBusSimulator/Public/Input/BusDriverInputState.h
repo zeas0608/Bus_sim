@@ -10,6 +10,9 @@ struct FBusDriverInputState
     GENERATED_BODY()
 
     UPROPERTY(BlueprintReadOnly, Category="Bus Input")
+    bool bInvalidAxes = false;
+
+    UPROPERTY(BlueprintReadOnly, Category="Bus Input")
     float Throttle = 0.0f; // RT, 0 (released) to 1 (fully pressed)
 
     UPROPERTY(BlueprintReadOnly, Category="Bus Input")

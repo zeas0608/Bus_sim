@@ -1,6 +1,7 @@
 // Compile the production powertrain with a C++17 compiler; see docs/1086-MT.md.
 #include "Vehicle/ManualPowertrain.h"
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <limits>
 using namespace BusMT;
@@ -55,5 +56,20 @@ int main()
     i.Throttle=0; run(p,i,120); assert(p.Gear==1 && p.Engagement==0);
     for (int gear=2; gear<=6; ++gear) {pulse(p,i,true); assert(p.Gear==gear);}
     pulse(p,i,true); assert(p.LastShift==Shift::Limit);
+    // A road-load fixture, independent of Chaos: release the brake onto a 5% grade.
+    // Rear wheel speed feeds back into the same production clutch solve.
+    Powertrain hill; Input driver; hill.Ignition(); run(hill,driver);
+    driver.Pedal=1; pulse(hill,driver,true); driver.Throttle=.55f; run(hill,driver,25);
+    float speed=0;
+    for (int n=0;n<240;++n)
+    {
+        driver.Pedal=std::max(.12f,1.f-n/100.f);
+        driver.SpeedMS=speed;
+        driver.AxleRadS=speed/.39f;
+        hill.Advance(1.f/60,driver);
+        const float acceleration=hill.AxleNm/(.39f*8500.f)-9.81f*.05f;
+        if (n>50 || acceleration>0) speed+=acceleration/60.f; // service brake held during bite
+    }
+    assert(speed>2 && hill.State==Engine::Running);
     i.AxleRadS=110; pulse(p,i,false); assert(p.LastShift==Shift::OverRev && p.Gear==6);
 }

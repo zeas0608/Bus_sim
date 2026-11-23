@@ -461,6 +461,17 @@
       "roughness": 0.29,
       "alpha": 1.0,
       "emission": 0.0
+    },
+    "CabDialInk": {
+      "rgb": [
+        0.88,
+        0.92,
+        0.77
+      ],
+      "metallic": 0.0,
+      "roughness": 0.54,
+      "alpha": 1.0,
+      "emission": 0.25
     }
   },
   "bones": {

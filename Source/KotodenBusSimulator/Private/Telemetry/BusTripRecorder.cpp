@@ -14,7 +14,7 @@ void UBusTripRecorder::Toggle()
     if (!Writer) { UE_LOG(LogTemp, Error, TEXT("Cannot start 1086 telemetry in %s"), *Dir); return; }
     NextSample = Elapsed = 0;
     bFaultSinceSample = false;
-    Buffer = TEXT("time_s,frame_ms,mode,engine,rpm,gear,speed_m_s,lt,engagement,slip_rpm,rt,brake,steer,park,front_door,middle_door,fault");
+    Buffer = TEXT("time_s,frame_ms,mode,engine,rpm,gear,speed_m_s,lt,engagement,slip_rpm,rt,brake,steer,park,front_door,middle_door,lights,turn,cab,yaw_deg,fault");
     for (const auto* Wheel : {TEXT("fl"),TEXT("fr"),TEXT("rl"),TEXT("rr")})
         Buffer += FString::Printf(TEXT(",%s_drive_cmd_nm,%s_brake_cmd_nm,%s_drive_nm,%s_brake_nm"),Wheel,Wheel,Wheel,Wheel);
     Buffer += TEXT("\n");
@@ -57,6 +57,7 @@ void UBusTripRecorder::Sample(float Dt, const FBusDriveReading& R)
     for (float V : {R.Throttle,R.Brake,R.Steer}) Row += TEXT(",") + Number(V);
     Row += R.bPark ? TEXT(",1") : TEXT(",0");
     Row += TEXT(",") + Number(R.FrontDoor) + TEXT(",") + Number(R.MiddleDoor);
+    Row += FString::Printf(TEXT(",%d,%d,%d,%s"),int32(R.bHeadlights),R.Turn,int32(R.bCab),*Number(R.YawDeg));
     FString Axles;
     for (const auto& W : R.Wheels)
     {
