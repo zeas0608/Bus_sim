@@ -1,5 +1,8 @@
 # 1086号車：Windowsで最小操作の導入（自動化ツール）
 
+Issue #8の更新には **scripts/UPGRADE_KOTODEN1086.cmd** を使う。既存マップでAT・完全MT・自動クラッチMTを選べる。[更新と運転の手順](1086-MT.md)
+
+
 このページは `vehicle/kotoden-1086` のモデル・コードを使って Windows UE 5.5.4 で最初の走行を試すための手順。
 
 ## ユーザーが行う操作
