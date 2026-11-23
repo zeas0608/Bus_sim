@@ -81,8 +81,8 @@ try {
     }
     Write-Host "Backup folder: $backupRoot"
 
-    Invoke-UnrealBuild 'GenerateProjectFiles' @('-projectfiles', "-project=$projectFile", '-game', '-rocket', '-progress')
-    Invoke-UnrealBuild 'BuildEditor' @('KotodenBusSimulatorEditor', 'Win64', 'Development', "-Project=$projectFile", '-WaitMutex')
+    Invoke-UnrealBuild -Step 'GenerateProjectFiles' -Parameters @('-projectfiles', "-project=$projectFile", '-game', '-rocket', '-progress')
+    Invoke-UnrealBuild -Step 'BuildEditor' -Parameters @('KotodenBusSimulatorEditor', 'Win64', 'Development', "-Project=$projectFile", '-WaitMutex')
 
     # UE runs the Python script after the Editor starts. A result file is written inside Saved\Setup1086.
     # Launch the GUI Editor (not a commandlet) because the importer needs editor/world subsystems.
