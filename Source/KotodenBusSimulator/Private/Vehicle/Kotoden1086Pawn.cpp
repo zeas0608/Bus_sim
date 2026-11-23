@@ -10,6 +10,9 @@
 #include "Components/SpotLightComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
+#include "Engine/StaticMeshActor.h"
+#include "Engine/StaticMesh.h"
+#include "Components/StaticMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -194,6 +197,7 @@ void AKotoden1086Pawn::BeginPlay()
 void AKotoden1086Pawn::SetupPlayerInputComponent(UInputComponent* IC)
 {
     Super::SetupPlayerInputComponent(IC);
+    IC->BindKey(EKeys::G, IE_Pressed, this, &AKotoden1086Pawn::PlacePracticeRamp);
     IC->BindKey(EKeys::K, IE_Pressed, this, &AKotoden1086Pawn::ToggleRecording);
     IC->BindKey(EKeys::T, IE_Pressed, this, &AKotoden1086Pawn::CycleMode);
     IC->BindKey(EKeys::I, IE_Pressed, this, &AKotoden1086Pawn::Ignition);
@@ -231,7 +235,7 @@ void AKotoden1086Pawn::ApplyDriveAndBrake(const FBusDriverInputState& Input, flo
     AppliedBrake = Controls.ServiceBrake;
     if (Mode != EDriveMode::AT)
     {
-        ApplyManual(Input, GetWorld()->GetDeltaSeconds(), !Controls.DriveAllowed);
+        ApplyManual(Input, DriveDeltaSeconds, !Controls.DriveAllowed);
         return;
     }
     if (Range == EBusDriveRange::Reverse && M->GetTargetGear() != -1) M->SetTargetGear(-1, true);
@@ -279,6 +283,7 @@ void AKotoden1086Pawn::SignalRight()
 
 void AKotoden1086Pawn::Tick(float Dt)
 {
+    DriveDeltaSeconds = Dt;
     Super::Tick(Dt);
     UpdateIndicator();
     if (Recorder->IsRecording()) RecordDrive(Dt);
@@ -538,6 +543,7 @@ void AKotoden1086Pawn::ReleaseOverride()
 void AKotoden1086Pawn::EndPlay(const EEndPlayReason::Type Reason)
 {
     ReleaseOverride();
+    if (PracticeRamp.IsValid()) PracticeRamp->Destroy();
     Super::EndPlay(Reason);
 }
 
@@ -601,4 +607,31 @@ void AKotoden1086Pawn::UpdateIndicator()
         TrainingIndicator->SetText(FText::FromString(Text));
         PreviousIndicator = Text;
     }
+}
+
+void AKotoden1086Pawn::PlacePracticeRamp()
+{
+    if (PracticeRamp.IsValid() || !bParking || FMath::Abs(GetForwardSpeedKmh()) > StationaryKmh) return;
+    const FRotator Heading(0,GetActorRotation().Yaw,0);
+    const FVector Toe = GetActorLocation() + Heading.Vector()*1000.f;
+    FHitResult Floor;
+    FCollisionQueryParams Query;
+    Query.AddIgnoredActor(this);
+    if (!GetWorld()->LineTraceSingleByChannel(Floor, Toe + FVector(0,0,200), Toe - FVector(0,0,400),
+                                              ECC_WorldStatic, Query)) return;
+    UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!Cube) return;
+    // A 40 m long, 5 percent grade. Embed the lower lip slightly below the yard.
+    const FVector Center = Floor.ImpactPoint + Heading.Vector()*2000.f + FVector(0,0,87.f);
+    FActorSpawnParameters Params;
+    Params.ObjectFlags |= RF_Transient;
+    AStaticMeshActor* Ramp = GetWorld()->SpawnActor<AStaticMeshActor>(Center, FRotator(2.8624f,Heading.Yaw,0), Params);
+    if (!Ramp) return;
+    auto* Surface = Ramp->GetStaticMeshComponent();
+    Surface->SetMobility(EComponentMobility::Movable);
+    Surface->SetStaticMesh(Cube);
+    Surface->SetCollisionProfileName(TEXT("BlockAll"));
+    Ramp->SetActorScale3D(FVector(40.f,6.f,.20f));
+    PracticeRamp = Ramp;
+    ModeNotice = TEXT("5% practice grade ahead");
 }

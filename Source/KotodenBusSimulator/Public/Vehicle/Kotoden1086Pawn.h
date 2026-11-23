@@ -13,6 +13,7 @@ class UKotodenBusDisplay;
 class USpotLightComponent;
 class UPointLightComponent;
 class USkeletalMesh;
+class AStaticMeshActor;
 
 // Provisional vehicle calibration. Wheel, engine and drivetrain settings remain editable in a Blueprint.
 UCLASS()
@@ -63,6 +64,9 @@ private:
     bool bControlFault = false;
     FString ModeNotice;
     float BrakeNm[4]{};
+    TWeakObjectPtr<AStaticMeshActor> PracticeRamp;
+    float DriveDeltaSeconds = 0.f;
+    void PlacePracticeRamp();
     void CycleMode();
     void Ignition();
     UPROPERTY()
