@@ -42,7 +42,7 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     float Y = 48.0f;
     for (const FString& Line : Lines)
     {
-        DrawText(Line, FLinearColor::Cyan, LeftMargin, Y);
+        DrawText(Line, FLinearColor(0.0f, 1.0f, 1.0f, 1.0f), LeftMargin, Y);
         Y += LineHeight;
     }
 
@@ -50,7 +50,7 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     {
         DrawText(FString::Printf(TEXT("Forward speed: %+.1f km/h   Service brake: %.3f"),
             Vehicle->GetForwardSpeedKmh(), Vehicle->GetServiceBrakeCommand()),
-            FLinearColor::Cyan, LeftMargin, Y);
+            FLinearColor(0.0f, 1.0f, 1.0f, 1.0f), LeftMargin, Y);
     }
 
     if (!ClutchVehicle)
@@ -63,7 +63,7 @@ void ABusInputDiagnosticsHUD::DrawHUD()
     DrawText(FString::Printf(TEXT("Clutch engagement: %.3f   Engine command: %.1f Nm   External commands: %s"),
         ClutchVehicle->GetClutchEngagement(), ClutchVehicle->GetEngineTorqueCommandNm(),
         ClutchVehicle->AreExternalCommandsEnabled() ? TEXT("ON") : TEXT("BLOCKED")),
-        FLinearColor::Cyan, LeftMargin, Y);
+        FLinearColor(0.0f, 1.0f, 1.0f, 1.0f), LeftMargin, Y);
 
     for (int32 WheelIndex = 0; WheelIndex < Movement->GetNumWheels(); ++WheelIndex)
     {
@@ -75,6 +75,6 @@ void ABusInputDiagnosticsHUD::DrawHUD()
         Y += LineHeight;
         DrawText(FString::Printf(TEXT("Wheel %d (Nm) drive/brake: cmd %.1f / %.1f | Chaos %s"),
             WheelIndex, ClutchVehicle->GetDriveTorqueCommandNm(WheelIndex),
-            ClutchVehicle->GetBrakeTorqueCommandNm(), *PhysicsSample), FLinearColor::Cyan, LeftMargin, Y);
+            ClutchVehicle->GetBrakeTorqueCommandNm(), *PhysicsSample), FLinearColor(0.0f, 1.0f, 1.0f, 1.0f), LeftMargin, Y);
     }
 }
