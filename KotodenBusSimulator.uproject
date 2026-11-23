@@ -8,6 +8,11 @@
       "Name": "KotodenBusSimulator",
       "Type": "Runtime",
       "LoadingPhase": "Default"
+    },
+    {
+      "Name": "KotodenBusSimulatorEditor",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
     }
   ],
   "Plugins": [
@@ -18,6 +23,20 @@
     {
       "Name": "EnhancedInput",
       "Enabled": true
+    },
+    {
+      "Name": "PythonScriptPlugin",
+      "Enabled": true,
+      "TargetAllowList": [
+        "Editor"
+      ]
+    },
+    {
+      "Name": "EditorScriptingUtilities",
+      "Enabled": true,
+      "TargetAllowList": [
+        "Editor"
+      ]
     }
   ]
 }
