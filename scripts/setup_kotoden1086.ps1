@@ -90,8 +90,21 @@ try {
     $busContent = Join-Path $projectRoot 'Content\Kotoden1086'
     if ($Upgrade) {
         . (Join-Path $PSScriptRoot 'find_1086_level.ps1')
-        Invoke-UnrealBuild -Step 'BuildEditor' -Parameters @('KotodenBusSimulatorEditor', 'Win64', 'Development', "-Project=$projectFile", '-WaitMutex')
+        . (Join-Path $PSScriptRoot 'restore_1086_content.ps1')
+        Restore-Missing1086Content -ProjectRoot $projectRoot -LogFolder $logFolder
         $selected = Find-1086Level $busContent
+        if ($null -eq $selected) {
+            # A prior SUCCESS means there used to be locally generated .uasset/.umap files.
+            # A branch switch may stash them. Never silently replace those with a fresh import.
+            $oldImportReport = Join-Path $logFolder 'LatestImportResult.txt'
+            if (Test-Path -LiteralPath $oldImportReport -PathType Leaf) {
+                $oldImportState = Get-Content -LiteralPath $oldImportReport -TotalCount 1
+                if ($oldImportState -eq 'SUCCESS') {
+                    throw '1086 assets were imported previously but are missing now. No complete recovery backup was found. Stop to locate the original Content in a backup or Git stash; no files were overwritten.'
+                }
+            }
+        }
+        Invoke-UnrealBuild -Step 'BuildEditor' -Parameters @('KotodenBusSimulatorEditor', 'Win64', 'Development', "-Project=$projectFile", '-WaitMutex')
         if ($null -eq $selected) {
             $stage = Join-Path $PSScriptRoot 'prepare_1086_upgrade.py'
             Assert-File $stage
