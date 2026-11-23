@@ -288,7 +288,7 @@ def build(records, route, stops, meta, dem, plateau=()):
             if route is not None:
                 measure = route.project(p)
                 diff = abs((yaw - heading(route, measure) + 180) % 360 - 180)
-                if diff > 65 or route.distance(p) > 22:
+                if measure > 65 or diff > 65 or route.distance(p) > 22:
                     continue
                 score = p.distance(pos) + 0.25 * diff + route.distance(p)
             elif not one:

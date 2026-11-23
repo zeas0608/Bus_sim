@@ -1,9 +1,11 @@
 #include "TakamatsuStreetMeshLibrary.h"
 
+#include "AssetCompilingManager.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "CollisionQueryParams.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
-#include "Components/StaticMeshComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
@@ -83,6 +85,8 @@ bool UTakamatsuStreetMeshLibrary::CheckDepartureGround(AActor* PlayerStart, USta
     {
         return false;
     }
+    // Reopening the level can start async compilation before the first physics query.
+    FAssetCompilingManager::Get().FinishAllCompilation();
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(PlayerStart);
     // The current 1086 rig has a 4.40 m wheelbase and 1.88 m track.
