@@ -33,7 +33,9 @@ try {
         # Branch changes can hide Git-ignored .uasset/.umap files. Recover missing
         # files from an old setup snapshot without overwriting anything.
         . (Join-Path $PSScriptRoot 'restore_1086_content.ps1')
-        Restore-Missing1086Content -ProjectRoot $projectRoot -LogFolder (Join-Path $projectRoot 'Saved\Setup1086')
+        $recoveryLogs = Join-Path $projectRoot 'Saved\Setup1086'
+        New-Item -ItemType Directory -Force -Path $recoveryLogs | Out-Null
+        Restore-Missing1086Content -ProjectRoot $projectRoot -LogFolder $recoveryLogs
         $bus = Find-1086Level $busRoot
     }
     if ($null -eq $bus) {
