@@ -71,10 +71,14 @@ void UKotodenBusDisplay::PoseCab(float Steer, float Kmh, float Rpm, float FrontD
     Pose(TEXT("needle_speed"), FQuat(GaugeAxis, FMath::DegreesToRadians(270.0f * FMath::Clamp(Kmh / 120.0f, 0.0f, 1.0f))));
     Pose(TEXT("needle_rpm"), FQuat(GaugeAxis, FMath::DegreesToRadians(270.0f * FMath::Clamp(Rpm / 3000.0f, 0.0f, 1.0f))));
     Pose(TEXT("steering"), FQuat(FVector(-0.54, 0, 0.842).GetSafeNormal(), FMath::DegreesToRadians(Steer * 540.0f)));
+    // Ease the leaf at each end of travel. Plug doors clear the seal before sliding.
+    FrontDoor = FMath::SmoothStep(0.f, 1.f, FrontDoor);
+    const float Plug = FMath::SmoothStep(0.f, .20f, MiddleDoor);
+    const float Slide = FMath::SmoothStep(.12f, 1.f, MiddleDoor);
     Pose(TEXT("door_front_A"), FRotator(0, -85.0f * FrontDoor, 0).Quaternion());
     Pose(TEXT("door_front_B"), FRotator(0, 85.0f * FrontDoor, 0).Quaternion());
-    Pose(TEXT("door_mid_A"), FQuat::Identity, FVector(55, 4, 0) * MiddleDoor);
-    Pose(TEXT("door_mid_B"), FQuat::Identity, FVector(-55, 4, 0) * MiddleDoor);
+    Pose(TEXT("door_mid_A"), FQuat::Identity, FVector(55*Slide, 4*Plug, 0));
+    Pose(TEXT("door_mid_B"), FQuat::Identity, FVector(-55*Slide, 4*Plug, 0));
     Pose(TEXT("selector"), FQuat::Identity, FVector(3.84, 0, 1.44) * SelectedRange);
     Pose(TEXT("pedal_throttle"), FRotator(-Throttle * 12.0f, 0, 0).Quaternion());
     Pose(TEXT("pedal_brake"), FRotator(-Brake * 12.0f, 0, 0).Quaternion());

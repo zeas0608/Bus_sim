@@ -130,6 +130,7 @@ def _body_side(h, s, tag):
         z=.54+.042*i
         _side_box(h,tag+"_intake_louvre",s,-4.02,-3.28,z,z+.018,"ExtSlat",1.153,.008)
     for x in (-4.19,.10,3.97):
+        _side_box(h,tag+"_repeater_seal",s,x-.076,x+.076,.912,.965,"ExtRubber",1.154,.012)
         _side_box(h,tag+"_repeater",s,x-.065,x+.065,.92,.956,
                   "SignalLeft" if s==1 else "SignalRight",1.158,.014)
 
@@ -329,6 +330,9 @@ def _front_rear(h,front):
             lens("Headlamp_recess",.63,1.045,.675,.94,"ExtSlat",.017)
             lens("Headlamp_chrome",.653,1.022,.693,.912,"ExtMetal",.024)
             lens("Headlamp_main",.66,.867,.718,.891,"HeadlampLens",.029)
+            for rib in range(4):
+                u=.674+.048*rib
+                lens("Headlamp_prism",u,u+.008,.732,.879,"ExtMetal",.031)
             lens("Headlamp_high",.88,.977,.717,.889,"HeadlampLens",.029)
             lens("Front_indicator",.986,1.019,.706,.895,sig,.031)
             lens("Foglamp_bezel",.78,.991,.354,.466,"ExtSeam",.024)
@@ -337,6 +341,8 @@ def _front_rear(h,front):
             lens("Tail_light_cluster",.884,1.066,.68,1.123,"ExtRubber",.022)
             lens("Tail_indicator",.901,1.048,.994,1.097,sig,.03)
             lens("Tail_stop_lamp",.901,1.048,.81,.981,"TailLens",.031)
+            lens("Rear_reflector_surround",.92,1.039,.48,.55,"ExtRubber",.024)
+            lens("Rear_reflector",.928,1.031,.49,.54,"TailLens",.029)
             lens("Tail_reverse_lens",.901,1.048,.702,.794,"ExtIvory",.031)
     if front:
         _face_panel(h,"Fresh_air_recess",True,-.45,.45,.907,1.044,"ExtSeam",.01)

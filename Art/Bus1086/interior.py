@@ -44,6 +44,7 @@ def materials(h):
     }
     for name, (color, metal, rough) in palette.items():
         h.material(name, color, metallic=metal, roughness=rough)
+    h.material('CabDialInk', (.88, .92, .77), roughness=.54, emission=.25)
 
 
 def panel(h, name, origin, u, v, width, height, thickness, radius, material, bone='root'):
@@ -122,11 +123,11 @@ def dial(h, name, position, maximum, unit, bone, warning_from):
             verts += [o+d*length+t*offset for length,offset in ((near,-width),(far,-width),(far,width),(near,width))]
             faces.append(tuple(range(k,k+4)))
         if faces:
-            h.mesh(name+('Redline' if warning else 'Scale'), verts, faces, 'CabRed' if warning else 'CabWhite')
+            h.mesh(name+('Redline' if warning else 'Scale'), verts, faces, 'CabRed' if warning else 'CabDialInk')
     for j in range(7):
         a = math.radians(225-45*j)
         inscription(h, name+'Digit%02d'%j, format(maximum*j/6, 'g'), o+.064*(math.cos(a)*u+math.sin(a)*v),
-                    u,v,.022, 'CabWhite')
+                    u,v,.024, 'CabDialInk')
     inscription(h, name+'Units', unit, o-.026*v, u,v,.018,'CabWhite')
     a = math.radians(225)
     d = math.cos(a)*u + math.sin(a)*v
@@ -199,6 +200,11 @@ def cockpit(h):
         panel(h,bone+'Surround',p-.006*panel_n,UV_RIGHT,panel_up,.068,.065,.013,.009,'CabBlack')
         panel(h,bone+'Rocker',p,UV_RIGHT,panel_up,.049,.045,.009,.006,material,bone)
         inscription(h,bone+'Legend',label,p+.0015*panel_n, UV_RIGHT,panel_up,.030,'CabBlack',bone)
+    for bone, center, label, mat in SWITCHES:
+        # White outline on the stationary socket separates adjacent rockers in the cab view.
+        p = Vector(center) + .0008*panel_n
+        h.tube(bone+'Keyline',[p-.027*UV_RIGHT-.028*panel_up,p+.027*UV_RIGHT-.028*panel_up],
+               .0018,'CabDialInk',sides=6)
     p=Vector(SELECTOR)
     panel(h,'SelectorGate',p,UV_RIGHT,panel_up,.105,.138,.015,.015,'CabBlack')
     for j,label in enumerate('RND'):
@@ -359,6 +365,11 @@ def passenger_deck(h):
         for sign,tag in [(-1,'Right'),(1,'Left')]:
             box(tag+'CeilingLightCase%d'%j,(x,sign*.545,2.748),(1.05,.106,.034),'CabSilver',.012)
             box(tag+'CeilingDiffuser%d'%j,(x,sign*.545,2.731),(1.003,.084,.015),'CabWhite',.005)
+    # Request units at the two boarding areas; estimated housings, purely visual.
+    for tag, x, y, z in [('Mid',-1.32,.95,1.24), ('Front',3.991,.96,1.03)]:
+        box(tag+'CallHousing',(x,y-.020,z),(.082,.056,.137),'CabYellow',.012)
+        box(tag+'CallLens',(x,y-.053,z+.032),(.052,.009,.025),'CabRed',.003)
+        cyl(tag+'CallButton',(x,y-.045,z-.025),(x,y-.057,z-.025),.021,'CabBlack',sides=20)
     # Stainless grab rings guard the stair edge beside the middle door.
     tube('MiddleVestibuleRail',[(-1.32,.95,.55),(-1.32,.95,1.38),(-1.32,.91,1.43),
                                  (-1.32,.56,1.43)],.022,'CabOrange')

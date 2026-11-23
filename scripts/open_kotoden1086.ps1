@@ -15,20 +15,9 @@ try {
     if (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue) {
         throw 'Unreal Editor is already running. Please use its Content Browser to open the map, or close it before retrying.'
     }
-    $maps=@(Get-ChildItem -LiteralPath $mapsRoot -Filter 'L_1086_Drive.umap' -Recurse -File -ErrorAction SilentlyContinue |
-        Sort-Object @{Expression={$_.Directory.Name}; Descending=$true}, @{Expression={$_.LastWriteTime};Descending=$true})
-    if ($maps.Count -eq 0) {throw 'No L_1086_Drive.umap found under Content\Kotoden1086. Run START_KOTODEN1086.cmd for first-time import.'}
-    # Choose newest numbered Build_### with both Blueprint classes and map saved.
-    $selected=$null
-    foreach($map in $maps){
-        $folder=$map.Directory.FullName
-        if ((Test-Path -LiteralPath (Join-Path $folder 'BP_Kotoden1086.uasset') -PathType Leaf) -and
-            (Test-Path -LiteralPath (Join-Path $folder 'BP_KotodenDriveMode.uasset') -PathType Leaf)) {
-            $selected=$map
-            break
-        }
-    }
-    if($null -eq $selected){throw 'Bus maps found, but required Blueprints are missing. Stop and share diagnostics; do not reimport over them.'}
+    . (Join-Path $PSScriptRoot 'find_1086_level.ps1')
+    $selected = Find-1086Level $mapsRoot
+    if ($null -eq $selected) { throw 'No complete 1086 level found. Use UPGRADE_KOTODEN1086.cmd.' }
     $contentPrefix=(Join-Path $root 'Content') + [IO.Path]::DirectorySeparatorChar
     $relative=$selected.FullName.Substring($contentPrefix.Length)
     # Epic's command-line docs require the .umap extension for maps outside the Maps folder.

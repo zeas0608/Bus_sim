@@ -25,7 +25,7 @@ function Collect-Logs([string]$title,[string]$path) {
     try {
       $contents=Get-Content -LiteralPath $file.FullName -ErrorAction Stop
       Add '-- Recent errors/warnings (at most 40 lines) --'
-      @($contents | Select-String -Pattern 'Fatal error|Unhandled Exception|EXCEPTION_|LogWindows: Error|LogOutputDevice: Error|LogPython: Error|Assertion failed|ensure\(|Crash|LogPluginManager: Error|Error:|LogLinker: Warning|Failed to load' |
+      @($contents | Select-String -Pattern 'Fatal error|Unhandled Exception|EXCEPTION_|LogWindows: Error|LogOutputDevice: Error|LogPython: Error|Assertion failed|ensure\(|Crash|LogPluginManager: Error|Error:|error C[0-9]{4}|error LNK[0-9]+|error:|LogLinker: Warning|Failed to load' |
         Select-Object -Last 40) | ForEach-Object { Add ([string] $_.Line) }
       Add '-- Tail (last 100 lines) --'
       @($contents | Select-Object -Last 100) | ForEach-Object { Add ([string]$_) }
@@ -46,6 +46,31 @@ if(Test-Path -LiteralPath $busContent -PathType Container) {
   @(Get-ChildItem -LiteralPath $busContent -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue |
      Sort-Object FullName | Select-Object -ExpandProperty FullName) | ForEach-Object {Add ([string]$_)}
 } else { Add 'No Content\Kotoden1086 folder found.' }
+Add '== Recoverable 1086 backup snapshots =='
+$backupFolder=Join-Path (Split-Path $root -Parent) 'Recovery_Backup'
+$backups=@()
+if(Test-Path -LiteralPath $backupFolder -PathType Container) {
+  foreach($snapshot in @(Get-ChildItem -LiteralPath $backupFolder -Directory -ErrorAction SilentlyContinue)) {
+    $busFolder=Join-Path $snapshot.FullName 'Content\Kotoden1086'
+    if(Test-Path -LiteralPath $busFolder -PathType Container) {
+      $maps=@(Get-ChildItem -LiteralPath $busFolder -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue)
+      if($maps.Count -gt 0) {
+        $backups += [pscustomobject]@{Path=$snapshot.FullName;Modified=$snapshot.LastWriteTimeUtc;Maps=$maps.Count}
+      }
+    }
+  }
+}
+if($backups.Count -eq 0) {Add 'No 1086 backups found in Recovery_Backup (Git stash not inspected).'}
+else {
+  @($backups | Sort-Object Modified -Descending | Select-Object -First 5) | ForEach-Object {Add ("$($_.Path) ($($_.Maps) maps)")}
+}
+
+Collect-Logs 'Setup and upgrade' $dest
+Get-ChildItem -LiteralPath $dest -Filter '*-UpgradeResult.json' -File |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object {
+    Add "Upgrade result: $($_.Name)"
+    Add (Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8)
+  }
 Collect-Logs 'Project logs' (Join-Path $root 'Saved\Logs')
 Collect-Logs 'UE 5.5 user logs' (Join-Path $env:LOCALAPPDATA 'UnrealEngine\5.5\Saved\Logs')
 Add '== Crash folders (names and recent time only) =='

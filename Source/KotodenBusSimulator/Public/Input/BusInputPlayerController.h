@@ -21,7 +21,7 @@ class KOTODENBUSSIMULATOR_API ABusInputPlayerController : public APlayerControll
 
 public:
     UFUNCTION(BlueprintPure, Category="Bus Input")
-    FBusDriverInputState GetDriverInputState() const { return DriverInputState; }
+    FBusDriverInputState GetDriverInputState() const;
 
 protected:
     virtual void SetupInputComponent() override;

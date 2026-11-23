@@ -2,12 +2,18 @@
 
 #include "Vehicle/BusPrototypeVehiclePawn.h"
 #include "ChaosVehicleWheel.h"
+#include "Vehicle/ManualPowertrain.h"
 #include "Kotoden1086Pawn.generated.h"
 
 class UCameraComponent;
+class UBusTripRecorder;
+class UTextRenderComponent;
+class UBusDriveAudio;
 class UKotodenBusDisplay;
 class USpotLightComponent;
+class UPointLightComponent;
 class USkeletalMesh;
+class AStaticMeshActor;
 
 // Provisional vehicle calibration. Wheel, engine and drivetrain settings remain editable in a Blueprint.
 UCLASS()
@@ -40,6 +46,7 @@ public:
 
 protected:
     virtual void PreRegisterAllComponents() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
     virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
@@ -49,6 +56,35 @@ protected:
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 
 private:
+    enum class EDriveMode { AT, Manual, AutoClutch };
+    EDriveMode Mode = EDriveMode::AT;
+    BusMT::Powertrain Manual;
+    float DriverClutch = 0.f;
+    bool bWheelFault = false;
+    bool bControlFault = false;
+    FString ModeNotice;
+    float BrakeNm[4]{};
+    TWeakObjectPtr<AStaticMeshActor> PracticeRamp;
+    float DriveDeltaSeconds = 0.f;
+    void PlacePracticeRamp();
+    void CycleMode();
+    void Ignition();
+    UPROPERTY()
+    TObjectPtr<UTextRenderComponent> TrainingIndicator;
+    FString PreviousIndicator;
+    void UpdateIndicator();
+    void ToggleRecording();
+    void RecordDrive(float Dt);
+    UPROPERTY()
+    TObjectPtr<UBusDriveAudio> DriveAudio;
+    const TCHAR* EngineLabel() const;
+    UPROPERTY()
+    TObjectPtr<UBusTripRecorder> Recorder;
+    void ApplyManual(const FBusDriverInputState& Input, float Dt, bool bInterlock);
+    void ReleaseOverride();
+    float EngineRPM() const;
+    int32 DisplayGear() const;
+    const TCHAR* ModeLabel() const;
     void SelectRange(EBusDriveRange NewRange);
     void SelectDrive() { SelectRange(EBusDriveRange::Drive); }
     void SelectNeutral() { SelectRange(EBusDriveRange::Neutral); }
@@ -73,6 +109,10 @@ private:
     TObjectPtr<UKotodenBusDisplay> Display;
     UPROPERTY(VisibleAnywhere, Category="Bus")
     TObjectPtr<USpotLightComponent> LeftHeadlamp;
+    UPROPERTY(VisibleAnywhere, Category="Bus")
+    TObjectPtr<UPointLightComponent> FrontEntryLamp;
+    UPROPERTY(VisibleAnywhere, Category="Bus")
+    TObjectPtr<UPointLightComponent> MiddleEntryLamp;
     UPROPERTY(VisibleAnywhere, Category="Bus")
     TObjectPtr<USpotLightComponent> RightHeadlamp;
 

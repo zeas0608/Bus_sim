@@ -3,6 +3,7 @@
 # It never performs git stash, checkout, reset, clean, or modifies the source Blender/FBX files.
 [CmdletBinding()]
 param(
+    [switch] $Upgrade,
     [string] $UnrealRoot = 'C:\Program Files\Epic Games\UE_5.5'
 )
 
@@ -15,7 +16,7 @@ $buildBat = Join-Path $UnrealRoot 'Engine\Build\BatchFiles\Build.bat'
 $editorExe = Join-Path $UnrealRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
 $versionFile = Join-Path $UnrealRoot 'Engine\Build\Build.version'
 $importScript = Join-Path $PSScriptRoot 'launch_kotoden1086.py'
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$timestamp = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0,8)
 $logFolder = Join-Path $projectRoot 'Saved\Setup1086'
 New-Item -ItemType Directory -Force -Path $logFolder | Out-Null
 
@@ -46,15 +47,17 @@ function Invoke-UnrealBuild([string] $Step, [string[]] $Parameters) {
     Write-Host "$Step succeeded."
 }
 
+$mutex = New-Object System.Threading.Mutex($false,'Kotoden1086Setup')
+$locked = $false
 try {
+    try { $locked = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $locked = $true }
+    if (-not $locked) { throw 'Another 1086 setup is running.' }
     Write-Host 'Kotoden 1086 setup: safe backup, UE project generation, Editor build, automated import.'
     Write-Host "Project: $projectRoot"
     Write-Host "Engine: $UnrealRoot"
 
     foreach ($path in @($projectFile, $buildBat, $editorExe, $versionFile, $importScript,
         (Join-Path $PSScriptRoot 'import_kotoden1086.py'),
-        (Join-Path $projectRoot 'Art\Bus1086\Bus1086.fbx'),
-        (Join-Path $projectRoot 'Art\Bus1086\Bus1086.json'),
         (Join-Path $projectRoot 'Source\KotodenBusSimulatorEditor\KotodenBusSimulatorEditor.Build.cs'))) {
         Assert-File $path
     }
@@ -71,7 +74,7 @@ try {
     # Back up even if a previous manual recovery was performed.
     # The backup stays outside the git repository and never overwrites a prior backup.
     $backupRoot = Join-Path (Split-Path $projectRoot -Parent) ("Recovery_Backup\Kotoden1086-" + $timestamp)
-    New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $backupRoot | Out-Null
     foreach ($directory in @('Content', 'Config')) {
         $source = Join-Path $projectRoot $directory
         if (Test-Path -LiteralPath $source -PathType Container) {
@@ -85,6 +88,45 @@ try {
     # This is independent of the previous SUCCESS report, preventing duplicate imports
     # if the report is missing/stale or an old launcher was used.
     $busContent = Join-Path $projectRoot 'Content\Kotoden1086'
+    if ($Upgrade) {
+        . (Join-Path $PSScriptRoot 'find_1086_level.ps1')
+        . (Join-Path $PSScriptRoot 'restore_1086_content.ps1')
+        Restore-Missing1086Content -ProjectRoot $projectRoot -LogFolder $logFolder
+        $selected = Find-1086Level $busContent
+        if ($null -eq $selected) {
+            # A prior SUCCESS means there used to be locally generated .uasset/.umap files.
+            # A branch switch may stash them. Never silently replace those with a fresh import.
+            $oldImportReport = Join-Path $logFolder 'LatestImportResult.txt'
+            if (Test-Path -LiteralPath $oldImportReport -PathType Leaf) {
+                $oldImportState = Get-Content -LiteralPath $oldImportReport -TotalCount 1
+                if ($oldImportState -eq 'SUCCESS') {
+                    throw '1086 assets were imported previously but are missing now. No complete recovery backup was found. Stop to locate the original Content in a backup or Git stash; no files were overwritten.'
+                }
+            }
+        }
+        Invoke-UnrealBuild -Step 'BuildEditor' -Parameters @('KotodenBusSimulatorEditor', 'Win64', 'Development', "-Project=$projectFile", '-WaitMutex')
+        if ($null -eq $selected) {
+            $stage = Join-Path $PSScriptRoot 'prepare_1086_upgrade.py'
+            Assert-File $stage
+            $resultFile = Join-Path $logFolder "$timestamp-UpgradeResult.json"
+            $env:KOTODEN_UPGRADE_RESULT = $resultFile
+            $stageArgs = @(('"{0}"' -f $projectFile), ('-ExecutePythonScript="{0}"' -f $stage), '-unattended', '-nosplash', '-log')
+            $process = Start-Process -FilePath $editorExe -WorkingDirectory $projectRoot -ArgumentList $stageArgs -Wait -PassThru
+            if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $resultFile -PathType Leaf)) {
+                throw "Asset preparation failed (exit $($process.ExitCode)). Check the Editor log and $resultFile."
+            }
+            $result = Get-Content -LiteralPath $resultFile -Encoding UTF8 -Raw | ConvertFrom-Json
+            if ($result.status -ne 'ok') { throw "Asset preparation failed: $($result.error)" }
+            $selected = Find-1086Level $busContent
+            if ($null -eq $selected -or $result.level -ne "/Game/Kotoden1086/$($selected.Directory.Name)/L_1086_Drive") {
+                throw "Generated level did not pass the file checks. See $resultFile."
+            }
+        }
+        Write-Host "Ready: $($selected.FullName). Opening the normal Editor."
+        & (Join-Path $PSScriptRoot 'open_kotoden1086.ps1') -UnrealRoot $UnrealRoot
+        if (-not $?) { throw 'Normal Editor launch failed.' }
+        exit 0
+    }
     if (Test-Path -LiteralPath $busContent -PathType Container) {
         $maps = @(Get-ChildItem -LiteralPath $busContent -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue)
         if ($maps.Count -gt 0) {
@@ -115,7 +157,11 @@ try {
     Write-Host 'If the import fails, share Saved\Setup1086\LatestImportResult.txt.'
 } catch {
     Write-Host ''
+    "FAILED: $($_.Exception.Message)" | Out-File -LiteralPath (Join-Path $logFolder "$timestamp-SetupFailure.log") -Encoding utf8
     Write-Host "SETUP FAILED: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Existing Content and Config were not deleted. Check Saved\Setup1086 for logs."
     exit 1
+} finally {
+    if ($locked) { $mutex.ReleaseMutex() }
+    $mutex.Dispose()
 }
