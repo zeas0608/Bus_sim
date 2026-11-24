@@ -20,6 +20,8 @@ def write_overview(plan, path):
     ]
     colors = {
         "Asphalt": "#67727a",
+        "WidthEstimate": "#929d9e",
+        "TurningApron": "#a1a9a3",
         "Buildings": "#c7b99e",
         "Paving": "#d5cfc4",
         "Kerb": "#eeebe2",
@@ -55,7 +57,7 @@ def write_overview(plan, path):
             '<path d="M10 35h50" stroke="#263b46"/><text x="10" y="49" font-size="10">50 m</text>',
             f'<text x="8" y="{h + 18:.1f}" font-size="13">高松駅　御厩線47番 ｜ 赤い矢印は1086の発進位置</text>',
             f'<text x="8" y="{h + 36:.1f}" font-size="10">経路資料 {escape(str(survey["path_source"] or "なし"))}　乗場資料 {escape(survey["platform_evidence"])}</text>',
-            f'<text x="8" y="{h + 53:.1f}" font-size="10">橙破線は資料の経路線。車道幅・停止位置・信号形状には推定を含む。</text>',
+            f'<text x="8" y="{h + 53:.1f}" font-size="10">橙破線は資料の経路線。濃い灰が元の車道、明るい灰が仮の幅・旋回補助。停止位置・信号にも推定を含む。</text>',
             f'<text x="8" y="{h + 69:.1f}" font-size="9">{escape(plan["attribution"])}</text></g></svg>',
         ]
     )
