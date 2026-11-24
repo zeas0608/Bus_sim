@@ -198,17 +198,14 @@ def import_stage(plan, bus_folder, revision):
     sky = spawn(ue.SkyLight, ue.Vector(0, 0, 600))
     sky.light_component.set_mobility(ue.ComponentMobility.MOVABLE)
     sky.light_component.set_editor_property("real_time_capture", True)
-    sign = spawn(ue.TextRenderActor, ue.Vector(*plan["sign"]), yaw - 90)
-    label = sign.get_component_by_class(ue.TextRenderComponent)
-    bay = plan["survey"]["platform_evidence"]
-    label.set_text("47  |  " + ("Takamatsu Sta." if "unverified" in bay else "5  Takamatsu Sta."))
-    label.set_world_size(15)
-    # Carry provenance in the level as well as the local source receipt.
-    credit = spawn(ue.TextRenderActor, ue.Vector(x, y, z + 165), yaw + 180)
+    # The Japanese bay/route lettering is printed onto the physical sign mesh.
+    # Place source credits on the back of its cabinet, clear of the driver's sightline.
+    credit = spawn(ue.TextRenderActor, ue.Vector(*plan["sign"]), plan["board_yaw"])
     credit.set_actor_label(plan["attribution"])
     credit_text = credit.get_component_by_class(ue.TextRenderComponent)
+    credit_text.set_horizontal_alignment(ue.HorizTextAligment.EHTA_CENTER)
     credit_text.set_text("© OpenStreetMap contributors | Kotoden GTFS")
-    credit_text.set_world_size(8)
+    credit_text.set_world_size(2)
     if not assets.save_directory(folder, False, True) or not levels.save_current_level():
         raise RuntimeError("Could not save generated level and street mesh packages")
     if not levels.load_level(level):

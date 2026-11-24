@@ -8,6 +8,7 @@ from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
 from shapely.affinity import rotate
 from shapely.geometry import LineString, Point, box
 from shapely.ops import nearest_points, substring, unary_union
+from street_details import decorate
 from survey import BBOX, is_five, project
 
 ROAD_WIDTH = {
@@ -241,12 +242,14 @@ def build(records, route, stops, meta, dem, plateau=()):
                     minimum = max(BUS_TWO_WAY_M, BUS_LANE_ESTIMATE_M * lane_count)
                 if minimum > width + 0.01:
                     provisional_widths.append((g, minimum))
-                    provisional_width_evidence.append({
-                        "id": fid,
-                        "source_width_m": round(width, 2),
-                        "playable_estimate_m": round(minimum, 2),
-                        "reason": "No explicit OSM width; extra driving surface, not surveyed asphalt",
-                    })
+                    provisional_width_evidence.append(
+                        {
+                            "id": fid,
+                            "source_width_m": round(width, 2),
+                            "playable_estimate_m": round(minimum, 2),
+                            "reason": "No explicit OSM width; extra driving surface, not surveyed asphalt",
+                        }
+                    )
             # Capture node locations before reversing the one-way line; ids
             # always refer to the source line order, not the travel direction.
             for nid, xy in zip(ids, g.coords):
@@ -300,23 +303,38 @@ def build(records, route, stops, meta, dem, plateau=()):
     mapped_islands = unary_union(islands).intersection(extent)
     base_pavement = base_pavement.difference(mapped_islands)
     focus = route.buffer(JUNCTION_FOCUS_RADIUS_M) if route is not None else stops[0].buffer(35)
-    junctions = [nid for nid, count in refs.items() if count > 1 and nid in node_positions
-                 and focus.intersects(node_positions[nid])]
+    junctions = [
+        nid
+        for nid, count in refs.items()
+        if count > 1 and nid in node_positions and focus.intersects(node_positions[nid])
+    ]
     # Schematic corner aprons: only at shared OSM nodes near the route.
     # They are a separate material in-game, not claimed as real asphalt.
-    apron = unary_union([
-        node_positions[nid].buffer(max(node_widths[nid]) / 2 + JUNCTION_TURN_APRON_EXTRA_M)
-        for nid in junctions
-    ]).intersection(extent).difference(base_pavement).difference(mapped_islands)
+    apron = (
+        unary_union(
+            [
+                node_positions[nid].buffer(max(node_widths[nid]) / 2 + JUNCTION_TURN_APRON_EXTRA_M)
+                for nid in junctions
+            ]
+        )
+        .intersection(extent)
+        .difference(base_pavement)
+        .difference(mapped_islands)
+    )
     # Only add corridor width where source geometry has NO explicit width.
     # Exclude mapped islands and buildings, and keep the source asphalt layer
     # untouched. The distinct material makes approximations visible in-game.
     corridors = route.buffer(ROUTE_WIDTH_FOCUS_M) if route is not None else stops[0].buffer(35)
     potential_width = unary_union([g.buffer(w / 2) for g, w in provisional_widths])
     obstacles_for_width = unary_union([g for g, *_ in buildings] + [g for g, *_ in plateau])
-    estimated_width = potential_width.intersection(corridors).difference(base_pavement).difference(
-        mapped_islands
-    ).difference(obstacles_for_width).difference(apron).intersection(extent)
+    estimated_width = (
+        potential_width.intersection(corridors)
+        .difference(base_pavement)
+        .difference(mapped_islands)
+        .difference(obstacles_for_width)
+        .difference(apron)
+        .intersection(extent)
+    )
     pavement = unary_union([base_pavement, apron, estimated_width])
     walk = unary_union(walks + explicit_walks).difference(pavement).union(mapped_islands).intersection(extent)
     # Positive platform evidence outranks an undifferentiated station stop coordinate.
@@ -429,13 +447,6 @@ def build(records, route, stops, meta, dem, plateau=()):
             for s in range(0, int(stripe.length), 8):
                 dash = substring(stripe, s, min(s + 3, stripe.length)).buffer(0.075, cap_style="flat")
                 dividers.append(dash.difference(junction_keepout))
-    for p in crossings:
-        g, w, _, _ = min(roads, key=lambda r: r[0].distance(p))
-        if g.distance(p) < w / 2 + 1:
-            a = heading(g, g.project(p))
-            for i in range(-int(w / 2), int(w / 2) + 1):
-                rect = box(p.x + i - 0.23, p.y - 1.6, p.x + i + 0.23, p.y + 1.6)
-                dividers.append(rotate(rect, -a, origin=(p.x, p.y)))
     layers.extrusion("Paint", unary_union(dividers).intersection(pavement), 0.024)
     for geom, h, fid, basis in list(plateau) + buildings:
         if fid.startswith("way/") or fid.startswith("relation/"):
@@ -445,33 +456,23 @@ def build(records, route, stops, meta, dem, plateau=()):
             cropped = geom.intersection(extent)
             layers.extrusion("Buildings", cropped, h, -0.25, False)
             evidence.append({"id": fid, "building_height_m": h, "basis": basis})
-    for roof, roof_id, basis in shelters:
-        clipped = roof.intersection(extent)
-        layers.extrusion("Shelters", clipped, 4.45, 4.2, False)
-        evidence.append({"id": roof_id, "basis": basis})
-    for fid, t, p in signs:
-        if t.get("highway") != "traffic_signals":
-            continue
-        # Signal nodes often denote the middle of a junction. Move schematic housing to the edge.
-        edge = nearest_points(p, pavement.boundary)[1] if pavement.contains(p) else p
-        layers.extrusion("Posts", edge.buffer(0.09), 4.3, 0)
-        layers.extrusion(
-            "SignalHousing", box(edge.x - 0.46, edge.y - 0.17, edge.x + 0.46, edge.y + 0.17), 4.5, 4.12
-        )
-        # Three unlit lenses; signal phases and surveyed head direction are unavailable.
-        for shift in (-0.28, 0, 0.28):
-            lens = box(edge.x + shift - 0.09, edge.y + 0.17, edge.x + shift + 0.09, edge.y + 0.20)
-            layers.extrusion("SignalLens", lens, 4.40, 4.21)
-        evidence.append({"id": fid, "symbol": "signal head/pole arrangement estimated; static"})
     board = nearest_points(pos, pavement.boundary)[1] if pavement.contains(pos) else pos
-    layers.extrusion("Posts", board.buffer(0.06), 2.4, 0)
-    layers.extrusion("StopSign", board.buffer(0.26), 2.45, 2.05)
-    if extent.contains(stops[1]) and route is not None and route.distance(stops[1]) < 30:
-        next_board = (
-            nearest_points(stops[1], pavement.boundary)[1] if pavement.contains(stops[1]) else stops[1]
-        )
-        layers.extrusion("Posts", next_board.buffer(0.06), 2.4, 0)
-        layers.extrusion("StopSign", next_board.buffer(0.26), 2.45, 2.05)
+    primary = decorate(
+        layers,
+        records,
+        roads,
+        pavement,
+        walk,
+        obstacles,
+        shelters,
+        stops,
+        route,
+        board,
+        meta,
+        extent,
+        evidence,
+    )
+    en = primary.p(0, 0.062, 1.30)
     meta["route_en_m"] = [[round(e, 2), round(n, 2)] for e, n in route.coords] if route is not None else []
     meta.update(
         spawn_way=candidates[0][1],
@@ -492,7 +493,8 @@ def build(records, route, stops, meta, dem, plateau=()):
     return {
         "meshes": layers.finish(),
         "spawn": [spawn.y * 100, spawn.x * 100, dem(spawn.x, spawn.y) * 100 + 125, yaw],
-        "sign": [board.y * 100, board.x * 100, dem(board.x, board.y) * 100 + 255],
+        "sign": [en[1] * 100, en[0] * 100, en[2] * 100],
+        "board_yaw": math.degrees(math.atan2(-primary.uy, primary.ux)),
         "survey": meta,
         "features": evidence,
     }

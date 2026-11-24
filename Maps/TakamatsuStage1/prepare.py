@@ -188,7 +188,9 @@ def run(saved, offline=False, today=None):
         json.dumps(plan, ensure_ascii=False, separators=(",", ":"), allow_nan=False), encoding="utf-8"
     )
     temp.replace(target)
-    visible = {k: plan[k] for k in ("meshes", "spawn", "sign", "attribution", "materials", "artwork")}
+    visible = {
+        k: plan[k] for k in ("meshes", "spawn", "sign", "board_yaw", "attribution", "materials", "artwork")
+    }
     visible["bay"] = survey["platform_evidence"]
     checksum = hashlib.sha256(json.dumps(visible, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     (saved / "geometry.sha256").write_text(checksum, encoding="ascii")
