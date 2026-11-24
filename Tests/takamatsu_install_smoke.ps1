@@ -52,11 +52,21 @@ $installer=Join-Path $projectScripts 'install_takamatsu_stage1.ps1'
 & $installer -UnrealRoot $engine
 & $installer -UnrealRoot $engine
 if ($calls.Imports -ne 1 -or $calls.Opens -ne 2) { throw 'Identical rerun failed to reuse stage' }
+# A partial cached build must result in a new directory. Other map assets may be local work.
+$stageRoot=Join-Path $projectDir 'Content/TakamatsuRoute/Stage01'
+$first=@(Get-ChildItem -LiteralPath $stageRoot -Directory)[0]
+$priorMap=Join-Path $first.FullName 'L_TakamatsuStation47.umap'
+$original[$priorMap]=(Get-FileHash $priorMap).Hash
+Move-Item -LiteralPath (Join-Path $first.FullName 'T_Asphalt_BC.uasset') -Destination (Join-Path $fixture 'held-texture.uasset')
+& $installer -UnrealRoot $engine
+if ($calls.Imports -ne 2 -or $calls.Opens -ne 3 -or @(Get-ChildItem -LiteralPath $stageRoot -Directory).Count -ne 2) {
+    throw 'Partial map build did not cause isolated regeneration'
+}
 $calls.Fail=$true
 $null=Write-Fixture 'project/Saved/TakamatsuStage1/geometry.sha256' 'different'
 & $installer -UnrealRoot $engine
-if ($LASTEXITCODE -ne 1 -or $calls.Opens -ne 2) { throw 'Failed import launched the normal editor' }
+if ($LASTEXITCODE -ne 1 -or $calls.Opens -ne 3) { throw 'Failed import launched the normal editor' }
 foreach ($path in $original.Keys) {
     if ((Get-FileHash $path).Hash -ne $original[$path]) { throw 'Protected asset changed' }
 }
-Write-Host 'PASS new stage, unchanged rerun, failed import and protected asset hashes'
+Write-Host 'PASS new stage, unchanged rerun, missing texture recovery, failed import and protected asset hashes'

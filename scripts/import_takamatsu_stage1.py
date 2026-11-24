@@ -46,6 +46,8 @@ def import_textures(art, hashes, folder):
                 if normal
                 else ue.TextureCompressionSettings.TC_DEFAULT,
                 "srgb": not normal,
+                "compression_no_alpha": False,
+                "flip_green_channel": False,
             }
         )
         textures[name] = texture
@@ -98,19 +100,19 @@ def street_material(tools, folder, name, spec, textures):
                 if normal
                 else ue.MaterialSamplerType.SAMPLERTYPE_COLOR,
             )
-            wire(coord, "", expr, "Coordinates")
+            wire(coord, "", expr, "")  # UVs are the texture sample's first input.
             return expr
 
         base = sample(tile + "_BC" if tile else image, False, 0)
-        base_pin = "RGB"
+        base_pin = ""
         if tile:
             connect(base, "A", prop.MP_ROUGHNESS)
-            connect(sample(tile + "_N", True, 280), "RGB", prop.MP_NORMAL)
+            connect(sample(tile + "_N", True, 280), "", prop.MP_NORMAL)
         if spec.get("masked"):
             connect(base, "A", prop.MP_OPACITY_MASK)
         if "tint" in spec:
             multiply = node(ue.MaterialExpressionMultiply, -190, 0)
-            wire(base, "RGB", multiply, "A")
+            wire(base, "", multiply, "A")
             wire(rgb(spec["tint"], -160), "", multiply, "B")
             base, base_pin = multiply, ""
     else:
@@ -250,7 +252,15 @@ def import_stage(plan, bus_folder, revision):
     credit.set_actor_label(plan["attribution"])
     credit_text = credit.get_component_by_class(ue.TextRenderComponent)
     credit_text.set_horizontal_alignment(ue.HorizTextAligment.EHTA_CENTER)
-    credit_text.set_text("© OpenStreetMap contributors | Kotoden GTFS")
+    credits = ["© OpenStreetMap contributors (ODbL)", "Kotoden Bus / GTFS"]
+    for token, credit_line in (
+        ("国土地理院", "GSI Japan / elevation tiles"),
+        ("PLATEAU", "MLIT PLATEAU / Takamatsu City 2022"),
+        ("高松市オープンデータ", "Takamatsu City / Open Data (CC BY 4.0)"),
+    ):
+        if token in plan["attribution"]:
+            credits.append(credit_line)
+    credit_text.set_text("\n".join(credits))
     credit_text.set_world_size(2)
     if not assets.save_directory(folder, False, True) or not levels.save_current_level():
         raise RuntimeError("Could not save generated level and street mesh packages")
