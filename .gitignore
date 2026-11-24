@@ -39,5 +39,10 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
+# Unreal Editor .uasset/.umap generated locally by the 1086 import/upgrade.
+# Preserve on disk and in external Recovery_Backup, but do not stage as source.
+# Ignores only generated versioned Build folders; hand-authored Content remains trackable.
+/Content/Kotoden1086/Build_*/
+
 # Local street meshes/levels generated from the user's geographic data snapshots
 /Content/TakamatsuRoute/Stage01/Build_*/
