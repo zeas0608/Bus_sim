@@ -123,6 +123,7 @@ def run(saved, offline=False, today=None):
         warnings.append("Flat local datum, GSI unavailable: " + str(e))
         dem = Elevation({})
     plateau = []
+    roof_faces = {}
     paths = sorted(local.glob("*.gml"))
     plateau_receipt = cache / "plateau.json"
     if not paths:
@@ -145,20 +146,33 @@ def run(saved, offline=False, today=None):
             paths = []
             warnings.append("PLATEAU unavailable; OSM footprints used: " + str(e))
     for path in paths:
-        result = plateau_buildings(path)
+        result = plateau_buildings(path, roof_faces)
         plateau.extend(result)
         sources.append(dict(file=path.name, provider=PLATEAU, sha256=digest(path), buildings=len(result)))
     try:
-        plan = build(features, route, stops, survey, dem, plateau)
+        plan = build(features, route, stops, survey, dem, plateau, roof_faces)
     except ValueError as e:
         if "GSI DEM has no sample" not in str(e):
             raise
         warnings.append(str(e) + "; entire stage uses flat local datum")
         dem = Elevation({})
-        plan = build(features, route, stops, survey, dem, plateau)
+        plan = build(features, route, stops, survey, dem, plateau, roof_faces)
     if dem.filled:
         warnings.append(
             f"GSI voids filled using a neighbouring sample within two pixels per axis: {len(dem.filled)}"
+        )
+    city_landmarks = [
+        f for f in plan["features"] if str(f.get("identity_source", "")).startswith("Takamatsu City/")
+    ]
+    if city_landmarks:
+        civic = json.loads(Path(__file__).with_name("landmarks.json").read_text(encoding="utf-8"))
+        sources.append(
+            {
+                "provider": "https://github.com/takamatsu-city/opendata/tree/" + civic["revision"],
+                "license": civic["license"],
+                "publisher": civic["publisher"],
+                "matches": [f["identity_source"] for f in city_landmarks],
+            }
         )
     plan.update(
         schema=1,
@@ -170,10 +184,13 @@ def run(saved, offline=False, today=None):
         terrain="GSI DEM 10 m" if dem.variable else "flat estimate",
         attribution="© OpenStreetMap contributors (ODbL) | ことでんバス GTFS"
         + (" | 国土地理院 標高タイル" if dem.variable else "")
-        + (" | PLATEAU 高松市 2022" if plateau else ""),
+        + (" | PLATEAU 高松市 2022" if plateau else "")
+        + (" | 高松市オープンデータ CC BY 4.0" if city_landmarks else ""),
     )
     art = Path(__file__).resolve().parent / "Art"
-    styles = json.loads((art / "appearance.json").read_text(encoding="utf-8"))["materials"]
+    appearance = json.loads((art / "appearance.json").read_text(encoding="utf-8"))
+    plan["daylight"] = appearance["daylight"]
+    styles = appearance["materials"]
     plan["materials"] = {name: styles[name] for name in plan["meshes"]}
     images = set()
     for spec in plan["materials"].values():
@@ -189,7 +206,8 @@ def run(saved, offline=False, today=None):
     )
     temp.replace(target)
     visible = {
-        k: plan[k] for k in ("meshes", "spawn", "sign", "board_yaw", "attribution", "materials", "artwork")
+        k: plan[k]
+        for k in ("meshes", "spawn", "sign", "board_yaw", "attribution", "materials", "artwork", "daylight")
     }
     visible["bay"] = survey["platform_evidence"]
     checksum = hashlib.sha256(json.dumps(visible, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

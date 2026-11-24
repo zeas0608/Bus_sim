@@ -189,15 +189,61 @@ def import_stage(plan, bus_folder, revision):
         component.set_collision_profile_name("BlockAll" if collides else "NoCollision")
     x, y, z, yaw = plan["spawn"]
     spawn(ue.PlayerStart, ue.Vector(x, y, z), yaw).set_actor_label("1086 departure")
-    light = spawn(ue.DirectionalLight, ue.Vector(0, 0, 600), 135, -48)
-    light.get_component_by_class(ue.DirectionalLightComponent).set_mobility(ue.ComponentMobility.MOVABLE)
-    light.get_component_by_class(ue.DirectionalLightComponent).set_editor_property(
-        "atmosphere_sun_light", True
+    daylight = plan["daylight"]
+    light = spawn(
+        ue.DirectionalLight,
+        ue.Vector(0, 0, 600),
+        (daylight["sun_azimuth"] + 180) % 360,
+        -daylight["sun_elevation"],
     )
+    sun = light.get_component_by_class(ue.DirectionalLightComponent)
+    sun.set_mobility(ue.ComponentMobility.MOVABLE)
+    sun.set_editor_properties(
+        {
+            "atmosphere_sun_light": True,
+            "use_temperature": True,
+            "shadow_bias": 0.45,
+            "contact_shadow_length": 0.035,
+        }
+    )
+    sun.set_temperature(daylight["temperature_k"])
+    sun.set_light_source_angle(daylight["source_angle"])
+    extended = bool(
+        ue.SystemLibrary.get_console_variable_int_value(
+            "r.DefaultFeature.AutoExposure.ExtendDefaultLuminanceRange"
+        )
+    )
+    sun.set_intensity(daylight["sun_lux"] if extended else 8.0)
     spawn(ue.SkyAtmosphere)
-    sky = spawn(ue.SkyLight, ue.Vector(0, 0, 600))
+    sky = spawn(ue.SkyLight, ue.Vector(0, 0, 700))
     sky.light_component.set_mobility(ue.ComponentMobility.MOVABLE)
     sky.light_component.set_editor_property("real_time_capture", True)
+    sky.light_component.set_intensity(1.0)
+    fog = spawn(ue.ExponentialHeightFog, ue.Vector(0, 0, -250)).get_component_by_class(
+        ue.ExponentialHeightFogComponent
+    )
+    fog.set_fog_density(0.012)
+    fog.set_start_distance(5500)
+    fog.set_fog_height_falloff(0.22)
+    volume = spawn(ue.PostProcessVolume)
+    volume.set_actor_label("Takamatsu afternoon - driver exposure")
+    volume.set_editor_property("unbound", True)
+    settings = volume.get_editor_property("settings")
+    # Retain the project's renderer/scalability. Keep adaptation bounded for a dark cab and bright plaza.
+    for prop, value in {
+        "auto_exposure_min_brightness": 10.0 if extended else 0.32,
+        "auto_exposure_max_brightness": 15.5 if extended else 2.8,
+        "auto_exposure_bias": 0.0,
+        "bloom_intensity": 0.18,
+        "vignette_intensity": 0.10,
+        "motion_blur_amount": 0.04,
+        "ambient_occlusion_intensity": 0.62,
+        "screen_space_reflection_intensity": 55.0,
+        "screen_space_reflection_max_roughness": 0.55,
+    }.items():
+        settings.set_editor_property("override_" + prop, True)
+        settings.set_editor_property(prop, value)
+    volume.set_editor_property("settings", settings)
     # The Japanese bay/route lettering is printed onto the physical sign mesh.
     # Place source credits on the back of its cabinet, clear of the driver's sightline.
     credit = spawn(ue.TextRenderActor, ue.Vector(*plan["sign"]), plan["board_yaw"])
