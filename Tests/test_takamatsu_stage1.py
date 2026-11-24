@@ -142,6 +142,26 @@ class StageTest(unittest.TestCase):
             self.assertEqual(json.loads((root / "survey.json").read_text())["survey"]["signal_nodes"], 1)
             self.assertFalse((root / "Content").exists())
 
+    def test_bus_can_recover_off_road_and_turning_apron_is_marked(self):
+        # The first Windows Play test found a sharp 18 cm ground drop and
+        # insufficient turning room at estimated OSM junctions.
+        # Preserve source road widths; allow an expressly provisional apron.
+        with tempfile.TemporaryDirectory() as d:
+            root = fixture(Path(d))
+            route, stops, meta = read_route(root / "gtfs_kb.zip", dt.date(2026, 11, 23))
+            records = osm_features(root / "station.osm")
+            plan = build(records, route, stops, meta, Elevation({}))
+            layers = plan["meshes"]
+            self.assertIn("Asphalt", layers)
+            self.assertIn("TurningApron", layers)
+            self.assertGreater(plan["survey"]["turning_apron_area_m2"], 0)
+            self.assertGreater(plan["survey"]["estimated_turn_apron_junction_count"], 0)
+            self.assertEqual(plan["survey"]["ground_recovery_drop_m"], 0.025)
+            # All sample terrain points sit 2.5cm below the road, not 18cm.
+            self.assertEqual({p[2] for p in layers["Land"]["vertices"]}, {-2.5})
+            self.assertTrue(all(p[2] == 0 for p in layers["TurningApron"]["vertices"]))
+            self.assertIn("not surveyed", plan["survey"]["simulation_turning_note"])
+
     def test_missing_shape_uses_connected_relation(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
