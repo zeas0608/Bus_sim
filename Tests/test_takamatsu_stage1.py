@@ -165,8 +165,9 @@ class StageTest(unittest.TestCase):
     def test_provisional_width_only_for_route_aligned_missing_tags(self):
         # Do not inflate actual recorded widths or perpendicular side streets.
         with tempfile.TemporaryDirectory() as d:
-            root = fixture(Path(d))
-            osm = root / "station.osm"
+            root = Path(d)
+            inputs = fixture(root / "Inputs")
+            osm = inputs / "station.osm"
             tree = ET.parse(osm)
             for way in tree.getroot().findall("way"):
                 if way.attrib.get("id") in ("10", "11"):
