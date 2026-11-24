@@ -131,7 +131,13 @@ try {
                 -not (Test-Path -LiteralPath (Join-Path (Split-Path $disk -Parent) ("SM_" + $_ + ".uasset")) -PathType Leaf) -or
                 -not (Test-Path -LiteralPath (Join-Path (Split-Path $disk -Parent) ("M_" + $_ + ".uasset")) -PathType Leaf)
             })
-            if ((Test-Path -LiteralPath $disk -PathType Leaf) -and $missing.Count -eq 0) { $level = $previous.level }
+            if ($previous.PSObject.Properties['textures']) {
+                $missing += @($previous.textures | Where-Object {
+                    $_ -notmatch '^[A-Za-z][A-Za-z0-9_]*$' -or
+                    -not (Test-Path -LiteralPath (Join-Path (Split-Path $disk -Parent) ($_ + '.uasset')) -PathType Leaf)
+                })
+                if ((Test-Path -LiteralPath $disk -PathType Leaf) -and $missing.Count -eq 0) { $level = $previous.level }
+            }
         }
     }
     if (-not $level) {
@@ -143,7 +149,7 @@ try {
         if ($report.status -ne 'ok') { throw $report.error }
         if ($report.level -ne "/Game/TakamatsuRoute/Stage01/Build_$revision/L_TakamatsuStation47") { throw 'Unexpected generated level name.' }
         $level = $report.level
-        @{key=$key;level=$level;layers=$report.layers} | ConvertTo-Json | Set-Content -LiteralPath $index -Encoding UTF8
+        @{key=$key;level=$level;layers=$report.layers;textures=$report.textures} | ConvertTo-Json | Set-Content -LiteralPath $index -Encoding UTF8
     }
     Write-Host "Opening $level. Press Play in Selected Viewport."
     Start-Process -FilePath $editor -WorkingDirectory $projectRoot -ArgumentList @(('"{0}"' -f $project),('"{0}.umap"' -f $level),'-log') | Out-Null

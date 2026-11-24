@@ -38,8 +38,8 @@ function Start-Process {
         else {
             $rev=Split-Path $env:KOTODEN_STAGE_RUN -Leaf
             $level="/Game/TakamatsuRoute/Stage01/Build_$rev/L_TakamatsuStation47"
-            @{status='ok';level=$level;layers=@('Asphalt')} |ConvertTo-Json| Set-Content $result
-            foreach ($file in @('L_TakamatsuStation47.umap','SM_Asphalt.uasset','M_Asphalt.uasset')) {
+            @{status='ok';level=$level;layers=@('Asphalt');textures=@('T_Asphalt_BC')} |ConvertTo-Json| Set-Content $result
+            foreach ($file in @('L_TakamatsuStation47.umap','SM_Asphalt.uasset','M_Asphalt.uasset','T_Asphalt_BC.uasset')) {
                 $null=Write-Fixture "project/Content/TakamatsuRoute/Stage01/Build_$rev/$file" 'new'
             }
         }

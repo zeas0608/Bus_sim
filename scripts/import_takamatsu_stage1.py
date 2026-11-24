@@ -1,5 +1,6 @@
 """UE 5.5.4 editor process. Only publishes new packages in a unique Stage01 folder."""
 
+import hashlib
 import json
 import os
 import re
@@ -9,22 +10,123 @@ from pathlib import Path
 import unreal as ue
 
 ROOT = "/Game/TakamatsuRoute/Stage01"
-COLORS = {
-    "Land": (0.21, 0.24, 0.17),
-    "Asphalt": (0.075, 0.077, 0.075),
-    "TurningApron": (0.17, 0.19, 0.18),  # Provisional turn safety, not real surveyed asphalt
-    "WidthEstimate": (0.11, 0.12, 0.12),  # Missing road-width data, provisional bus-clearance surface
-    "Paving": (0.38, 0.34, 0.30),
-    "Kerb": (0.56, 0.55, 0.51),
-    "Paint": (0.9, 0.89, 0.77),
-    "Buildings": (0.48, 0.47, 0.42),
-    "Posts": (0.27, 0.28, 0.26),
-    "SignalHousing": (0.075, 0.08, 0.07),
-    "StopSign": (0.08, 0.40, 0.60),
-    "Shelters": (0.23, 0.35, 0.39),
-    "SignalLens": (0.08, 0.42, 0.25),
-}
 COLLIDING = {"Asphalt", "WidthEstimate", "TurningApron", "Paving", "Buildings", "Land", "Shelters"}
+
+
+def import_textures(art, hashes, folder):
+    """Import only this plan's shared textures into the freshly reserved map folder."""
+    textures = {}
+    for name, expected in hashes.items():
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name):
+            raise ValueError("Invalid artwork name")
+        path = art / (name + ".png")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+            raise RuntimeError(f"Map artwork changed after preparation: {name}")
+        task = ue.AssetImportTask()
+        task.set_editor_properties(
+            {
+                "filename": str(path),
+                "destination_path": folder,
+                "destination_name": "T_" + name,
+                "automated": True,
+                "replace_existing": False,
+                "save": False,
+                "factory": ue.TextureFactory(),
+            }
+        )
+        ue.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+        items = [v for v in task.get_objects() if isinstance(v, ue.Texture2D)]
+        if len(items) != 1:
+            raise RuntimeError(f"Failed texture import: {path}")
+        texture = items[0]
+        normal = name.endswith("_N")
+        texture.set_editor_properties(
+            {
+                "compression_settings": ue.TextureCompressionSettings.TC_NORMALMAP
+                if normal
+                else ue.TextureCompressionSettings.TC_DEFAULT,
+                "srgb": not normal,
+            }
+        )
+        textures[name] = texture
+    return textures
+
+
+def street_material(tools, folder, name, spec, textures):
+    edit = ue.MaterialEditingLibrary
+    prop = ue.MaterialProperty
+    material = tools.create_asset("M_" + name, folder, ue.Material, ue.MaterialFactoryNew())
+    if spec.get("masked"):
+        material.set_editor_properties(
+            {"blend_mode": ue.BlendMode.BLEND_MASKED, "two_sided": True, "opacity_mask_clip_value": 0.39}
+        )
+
+    def node(cls, x, y):
+        return edit.create_material_expression(material, cls, x, y)
+
+    def connect(expr, pin, output):
+        if not edit.connect_material_property(expr, pin, output):
+            raise RuntimeError(f"Could not connect {name} to {output}")
+
+    def wire(a, pin, b, slot):
+        if not edit.connect_material_expressions(a, pin, b, slot):
+            raise RuntimeError(f"Could not wire {name} input {slot}")
+
+    def scalar(value, x, y):
+        expr = node(ue.MaterialExpressionConstant, x, y)
+        expr.set_editor_property("r", value)
+        return expr
+
+    def rgb(value, y):
+        expr = node(ue.MaterialExpressionConstant3Vector, -450, y)
+        expr.set_editor_property("constant", ue.LinearColor(*value, 1))
+        return expr
+
+    tile = spec.get("tile")
+    image = spec.get("image")
+    if tile or image:
+        coord = node(ue.MaterialExpressionTextureCoordinate, -800, 0)
+        scale = 1 / spec.get("metres", 1)
+        coord.set_editor_properties({"u_tiling": scale, "v_tiling": scale})
+
+        def sample(key, normal, y):
+            expr = node(ue.MaterialExpressionTextureSample, -550, y)
+            expr.set_editor_property("texture", textures[key])
+            expr.set_editor_property(
+                "sampler_type",
+                ue.MaterialSamplerType.SAMPLERTYPE_NORMAL
+                if normal
+                else ue.MaterialSamplerType.SAMPLERTYPE_COLOR,
+            )
+            wire(coord, "", expr, "Coordinates")
+            return expr
+
+        base = sample(tile + "_BC" if tile else image, False, 0)
+        base_pin = "RGB"
+        if tile:
+            connect(base, "A", prop.MP_ROUGHNESS)
+            connect(sample(tile + "_N", True, 280), "RGB", prop.MP_NORMAL)
+        if spec.get("masked"):
+            connect(base, "A", prop.MP_OPACITY_MASK)
+        if "tint" in spec:
+            multiply = node(ue.MaterialExpressionMultiply, -190, 0)
+            wire(base, "RGB", multiply, "A")
+            wire(rgb(spec["tint"], -160), "", multiply, "B")
+            base, base_pin = multiply, ""
+    else:
+        base, base_pin = rgb(spec["color"], 0), ""
+    connect(base, base_pin, prop.MP_BASE_COLOR)
+    if not tile:
+        connect(scalar(spec["roughness"], -420, 310), "", prop.MP_ROUGHNESS)
+    if spec.get("metal"):
+        connect(scalar(spec["metal"], -410, 440), "", prop.MP_METALLIC)
+    if spec.get("emission"):
+        glow = node(ue.MaterialExpressionMultiply, -180, 540)
+        wire(base, base_pin, glow, "A")
+        wire(scalar(spec["emission"], -430, 555), "", glow, "B")
+        connect(glow, "", prop.MP_EMISSIVE_COLOR)
+    edit.recompile_material(material)
+    return material
 
 
 def import_stage(plan, bus_folder, revision):
@@ -65,20 +167,16 @@ def import_stage(plan, bus_folder, revision):
 
     world.get_world_settings().set_editor_property("default_game_mode", mode)
     tools = ue.AssetToolsHelpers.get_asset_tools()
+    art = Path(__file__).resolve().parents[1] / "Maps" / "TakamatsuStage1" / "Art"
+    textures = import_textures(art, plan["artwork"], folder)
     for name, data in plan["meshes"].items():
-        rgb = COLORS[name]
-        material = tools.create_asset("M_" + name, folder, ue.Material, ue.MaterialFactoryNew())
-        edit = ue.MaterialEditingLibrary
-        color = edit.create_material_expression(material, ue.MaterialExpressionConstant3Vector, 0, 0)
-        color.set_editor_property("constant", ue.LinearColor(*rgb, 1))
-        if not edit.connect_material_property(color, "", ue.MaterialProperty.MP_BASE_COLOR):
-            raise RuntimeError("Material connection failed: " + name)
-        edit.recompile_material(material)
+        material = street_material(tools, folder, name, plan["materials"][name], textures)
         collides = name in COLLIDING
-        mesh = ue.TakamatsuStreetMeshLibrary.create_street_mesh(
+        mesh = ue.TakamatsuStreetMeshLibrary.create_textured_street_mesh(
             folder + "/SM_" + name,
             [ue.Vector(*p) for p in data["vertices"]],
             data["triangles"],
+            [ue.Vector2D(*p) for p in data.get("uv", [])],
             material,
             collides,
         )
@@ -123,15 +221,15 @@ def import_stage(plan, bus_folder, revision):
         starts[0], assets.load_asset(folder + "/SM_Asphalt")
     ):
         raise RuntimeError("Saved street collision check failed at the 1086 wheel positions")
-    return level
+    return level, [texture.get_name() for texture in textures.values()]
 
 
 if __name__ == "__main__":
     run = Path(os.environ["KOTODEN_STAGE_RUN"])
     try:
         plan = json.loads((run.parent.parent / "plan.json").read_text(encoding="utf-8"))
-        level = import_stage(plan, os.environ["KOTODEN_STAGE_BUS"], "Build_" + run.name)
-        report = {"status": "ok", "level": level, "layers": list(plan["meshes"])}
+        level, texture_names = import_stage(plan, os.environ["KOTODEN_STAGE_BUS"], "Build_" + run.name)
+        report = {"status": "ok", "level": level, "layers": list(plan["meshes"]), "textures": texture_names}
     except Exception:
         report = {"status": "failed", "error": traceback.format_exc()}
         ue.log_error(report["error"])

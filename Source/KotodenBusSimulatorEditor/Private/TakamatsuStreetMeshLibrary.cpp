@@ -17,7 +17,14 @@
 UStaticMesh* UTakamatsuStreetMeshLibrary::CreateStreetMesh(const FString& PackageName,
     const TArray<FVector>& Vertices, const TArray<int32>& Triangles, UMaterialInterface* Material, bool bGroundCollision)
 {
-    if (!PackageName.StartsWith(TEXT("/Game/TakamatsuRoute/Stage01/Build_"))
+    return CreateTexturedStreetMesh(PackageName, Vertices, Triangles, {}, Material, bGroundCollision);
+}
+
+UStaticMesh* UTakamatsuStreetMeshLibrary::CreateTexturedStreetMesh(const FString& PackageName,
+    const TArray<FVector>& Vertices, const TArray<int32>& Triangles, const TArray<FVector2D>& TriangleUVs,
+    UMaterialInterface* Material, bool bGroundCollision)
+{
+    if ((!TriangleUVs.IsEmpty() && TriangleUVs.Num() != Triangles.Num()) || !PackageName.StartsWith(TEXT("/Game/TakamatsuRoute/Stage01/Build_"))
         || !FPackageName::IsValidLongPackageName(PackageName) || FPackageName::DoesPackageExist(PackageName)
         || FindPackage(nullptr, *PackageName) || !Material || Vertices.IsEmpty()
         || Triangles.IsEmpty() || Triangles.Num() % 3 != 0)
@@ -43,16 +50,29 @@ UStaticMesh* UTakamatsuStreetMeshLibrary::CreateStreetMesh(const FString& Packag
     Attributes.GetPolygonGroupMaterialSlotNames()[Group] = SurfaceSlot;
     for (int32 Index = 0; Index < Triangles.Num(); Index += 3)
     {
+        if (!Vertices.IsValidIndex(Triangles[Index]) || !Vertices.IsValidIndex(Triangles[Index + 1])
+            || !Vertices.IsValidIndex(Triangles[Index + 2]))
+        {
+            return nullptr;
+        }
+        const FVector& A = Vertices[Triangles[Index]];
+        const FVector Normal = FVector::CrossProduct(Vertices[Triangles[Index + 1]] - A,
+            Vertices[Triangles[Index + 2]] - A).GetSafeNormal();
+        const FVector AlongWall = FVector::CrossProduct(FVector::UpVector, Normal).GetSafeNormal();
         TArray<FVertexInstanceID, TInlineAllocator<3>> Corners;
         for (int32 Corner = 0; Corner < 3; ++Corner)
         {
             const int32 Point = Triangles[Index + Corner];
-            if (!Vertices.IsValidIndex(Point))
+            const FVector& P = Vertices[Point];
+            const FVector2D MetricUV = FMath::Abs(Normal.Z) > 0.65
+                ? FVector2D(P.Y, -P.X) / 100.0 : FVector2D(FVector::DotProduct(P, AlongWall), -P.Z) / 100.0;
+            const FVector2D& UV = TriangleUVs.IsEmpty() ? MetricUV : TriangleUVs[Index + Corner];
+            if (UV.ContainsNaN())
             {
                 return nullptr;
             }
             const FVertexInstanceID Instance = Description.CreateVertexInstance(FVertexID(Point));
-            Attributes.GetVertexInstanceUVs().Set(Instance, 0, FVector2f(Vertices[Point].Y / 100, Vertices[Point].X / 100));
+            Attributes.GetVertexInstanceUVs().Set(Instance, 0, FVector2f(UV));
             Corners.Add(Instance);
         }
         Description.CreatePolygon(Group, Corners);

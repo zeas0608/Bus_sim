@@ -172,13 +172,23 @@ def run(saved, offline=False, today=None):
         + (" | 国土地理院 標高タイル" if dem.variable else "")
         + (" | PLATEAU 高松市 2022" if plateau else ""),
     )
+    art = Path(__file__).resolve().parent / "Art"
+    styles = json.loads((art / "appearance.json").read_text(encoding="utf-8"))["materials"]
+    plan["materials"] = {name: styles[name] for name in plan["meshes"]}
+    images = set()
+    for spec in plan["materials"].values():
+        if "tile" in spec:
+            images.update([spec["tile"] + "_BC", spec["tile"] + "_N"])
+        if "image" in spec:
+            images.add(spec["image"])
+    plan["artwork"] = {name: digest(art / (name + ".png")) for name in sorted(images)}
     target = saved / "plan.json"
     temp = saved / ("plan-" + uuid.uuid4().hex + ".tmp")
     temp.write_text(
         json.dumps(plan, ensure_ascii=False, separators=(",", ":"), allow_nan=False), encoding="utf-8"
     )
     temp.replace(target)
-    visible = {k: plan[k] for k in ("meshes", "spawn", "sign", "attribution")}
+    visible = {k: plan[k] for k in ("meshes", "spawn", "sign", "attribution", "materials", "artwork")}
     visible["bay"] = survey["platform_evidence"]
     checksum = hashlib.sha256(json.dumps(visible, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     (saved / "geometry.sha256").write_text(checksum, encoding="ascii")

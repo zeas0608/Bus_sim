@@ -60,7 +60,7 @@ class Layers:
         self.data = {}
         self.elevation = elevation
 
-    def face(self, name, points):
+    def face(self, name, points, uv=None):
         # In EN, counterclockwise top triangles become UE clockwise looking down (+X north).
         mesh = self.data.setdefault(name, {"vertices": [], "triangles": [], "_index": {}})
         ids = []
@@ -72,6 +72,8 @@ class Layers:
             ids.append(mesh["_index"][p])
         if len(set(ids)) == 3:
             mesh["triangles"].extend(ids)
+            if uv is not None:
+                mesh.setdefault("uv", []).extend(uv)
 
     def extrusion(self, name, geom, top, bottom=None, drape=True):
         for raw in solids(geom):
