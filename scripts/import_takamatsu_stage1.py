@@ -12,6 +12,7 @@ ROOT = "/Game/TakamatsuRoute/Stage01"
 COLORS = {
     "Land": (0.21, 0.24, 0.17),
     "Asphalt": (0.075, 0.077, 0.075),
+    "TurningApron": (0.17, 0.19, 0.18),  # Provisional turn safety, not real surveyed asphalt
     "Paving": (0.38, 0.34, 0.30),
     "Kerb": (0.56, 0.55, 0.51),
     "Paint": (0.9, 0.89, 0.77),
@@ -22,7 +23,7 @@ COLORS = {
     "Shelters": (0.23, 0.35, 0.39),
     "SignalLens": (0.08, 0.42, 0.25),
 }
-COLLIDING = {"Asphalt", "Paving", "Buildings", "Land", "Shelters"}
+COLLIDING = {"Asphalt", "TurningApron", "Paving", "Buildings", "Land", "Shelters"}
 
 
 def import_stage(plan, bus_folder, revision):
