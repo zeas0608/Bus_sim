@@ -299,7 +299,7 @@ def build(records, route, stops, meta, dem, plateau=()):
     obstacles_for_width = unary_union([g for g, *_ in buildings] + [g for g, *_ in plateau])
     estimated_width = potential_width.intersection(corridors).difference(base_pavement).difference(
         mapped_islands
-    ).difference(obstacles_for_width).intersection(extent)
+    ).difference(obstacles_for_width).difference(apron).intersection(extent)
     pavement = unary_union([base_pavement, apron, estimated_width])
     walk = unary_union(walks + explicit_walks).difference(pavement).union(mapped_islands).intersection(extent)
     # Positive platform evidence outranks an undifferentiated station stop coordinate.
