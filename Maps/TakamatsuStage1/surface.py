@@ -36,9 +36,9 @@ ROUTE_WIDTH_FOCUS_M = 18.0
 # Safety-only minimum widths for *inferred* carriageways close to a known
 # Route 47 shape. These are playable estimates, NOT measured Takamatsu widths.
 # OSM's explicit width tag always wins and is never expanded by this rule.
-BUS_ONE_WAY_SINGLE_M = 5.8
-BUS_TWO_WAY_M = 7.2
-BUS_LANE_ESTIMATE_M = 3.6
+BUS_ONE_WAY_SINGLE_M = 6.4
+BUS_TWO_WAY_M = 7.6
+BUS_LANE_ESTIMATE_M = 3.8
 
 
 def number(s, default, lo, hi):
