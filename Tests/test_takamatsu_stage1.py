@@ -162,6 +162,30 @@ class StageTest(unittest.TestCase):
             self.assertTrue(all(p[2] == 0 for p in layers["TurningApron"]["vertices"]))
             self.assertIn("not surveyed", plan["survey"]["simulation_turning_note"])
 
+    def test_provisional_width_only_for_route_aligned_missing_tags(self):
+        # Do not inflate actual recorded widths or perpendicular side streets.
+        with tempfile.TemporaryDirectory() as d:
+            root = fixture(Path(d))
+            osm = root / "station.osm"
+            tree = ET.parse(osm)
+            for way in tree.getroot().findall("way"):
+                if way.attrib.get("id") in ("10", "11"):
+                    for tag in list(way.findall("tag")):
+                        if tag.attrib.get("k") == "width":
+                            way.remove(tag)
+            tree.write(osm, encoding="utf-8")
+            plan = prepare.run(root, True, dt.date(2026, 11, 23))
+            self.assertIn("WidthEstimate", plan["meshes"])
+            survey = plan["survey"]
+            self.assertGreater(survey["estimated_width_extra_area_m2"], 0)
+            records = {f["id"]: f for f in survey["estimated_width_segments"]}
+            self.assertEqual(set(records), {"way/10", "way/11"})
+            self.assertEqual(records["way/10"]["source_width_m"], 6.2)
+            self.assertEqual(records["way/10"]["playable_estimate_m"], 7.2)
+            self.assertEqual(records["way/11"]["source_width_m"], 5.5)
+            self.assertEqual(records["way/11"]["playable_estimate_m"], 5.8)
+            self.assertIn("provisional", survey["width_reproduction_note"])
+
     def test_missing_shape_uses_connected_relation(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
