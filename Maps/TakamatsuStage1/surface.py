@@ -2,7 +2,7 @@
 
 import math
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 
 from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
 from shapely.affinity import rotate
@@ -23,6 +23,14 @@ ROAD_WIDTH = {
     "road": 6,
 }
 WALK = {"footway", "pedestrian", "path", "platform", "steps", "cycleway"}
+
+# Stage1 experimental driveability guards, NOT official road geometry.
+# A shallow neighbouring ground surface prevents an 18 cm cliff at OSM centreline
+# polygons. A separately labelled turning apron supports large bus offtracking
+# around nearby mapped junctions, leaving surveyed tagged road widths unchanged.
+GROUND_RECOVERY_DROP_M = 0.025
+JUNCTION_TURN_APRON_EXTRA_M = 1.75
+JUNCTION_FOCUS_RADIUS_M = 12.0
 
 
 def number(s, default, lo, hi):
@@ -136,6 +144,7 @@ def build(records, route, stops, meta, dem, plateau=()):
     extent = box(*project(*BBOX[:2]), *project(*BBOX[2:]))
     roads, walks, islands, tagged_roads, buildings, signs = [], [], [], [], [], []
     platforms, refs, evidence = [], Counter(), []
+    node_positions, node_widths = {}, defaultdict(list)
     shelters = []
     lanes, explicit_walks, crossings = [], [], []
     for fid, t, g, ids in records:
@@ -193,6 +202,11 @@ def build(records, route, stops, meta, dem, plateau=()):
             w = number(t.get("width"), None, 1.5, 60)
             width = w or (count * 3.1 if count else ROAD_WIDTH[kind])
             one = t.get("oneway") in ("yes", "1", "true", "-1") or t.get("junction") == "roundabout"
+            # Capture node locations before reversing the one-way line; ids
+            # always refer to the source line order, not the travel direction.
+            for nid, xy in zip(ids, g.coords):
+                node_positions[nid] = Point(xy)
+                node_widths[nid].append(width)
             if t.get("oneway") == "-1":
                 g = LineString(list(g.coords)[::-1])
             roads.append((g, width, one, fid))
@@ -235,9 +249,21 @@ def build(records, route, stops, meta, dem, plateau=()):
         )
     if not roads:
         raise ValueError("No ground-level vehicle ways in station extent")
-    pavement = unary_union([g.buffer(w / 2) for g, w, _, _ in roads] + tagged_roads).intersection(extent)
+    # OSM-derived asphalt stays distinct from the *estimated* bus turning area.
+    # Driving safety must not be represented as a surveyed widening of the road.
+    base_pavement = unary_union([g.buffer(w / 2) for g, w, _, _ in roads] + tagged_roads).intersection(extent)
     mapped_islands = unary_union(islands).intersection(extent)
-    pavement = pavement.difference(mapped_islands)
+    base_pavement = base_pavement.difference(mapped_islands)
+    focus = route.buffer(JUNCTION_FOCUS_RADIUS_M) if route is not None else stops[0].buffer(35)
+    junctions = [nid for nid, count in refs.items() if count > 1 and nid in node_positions
+                 and focus.intersects(node_positions[nid])]
+    # Schematic corner aprons: only at shared OSM nodes near the route.
+    # They are a separate material in-game, not claimed as real asphalt.
+    apron = unary_union([
+        node_positions[nid].buffer(max(node_widths[nid]) / 2 + JUNCTION_TURN_APRON_EXTRA_M)
+        for nid in junctions
+    ]).intersection(extent).difference(base_pavement).difference(mapped_islands)
+    pavement = unary_union([base_pavement, apron])
     walk = unary_union(walks + explicit_walks).difference(pavement).union(mapped_islands).intersection(extent)
     # Positive platform evidence outranks an undifferentiated station stop coordinate.
     platform_geom = min(platforms, key=lambda x: x[0])[2] if platforms else stops[0]
@@ -328,8 +354,11 @@ def build(records, route, stops, meta, dem, plateau=()):
     else:
         meta["route_status"] = "No published shape; one-way bay departure only. First leg unverified."
     layers = Layers(dem)
-    layers.extrusion("Land", extent, -0.18)
-    layers.extrusion("Asphalt", pavement, 0)
+    # Land supports wheels just 2.5 cm beneath the road instead of dropping
+    # 18 cm outside mapped polygons. OSM sidewalks remain raised and visible.
+    layers.extrusion("Land", extent, -GROUND_RECOVERY_DROP_M)
+    layers.extrusion("Asphalt", base_pavement, 0)
+    layers.extrusion("TurningApron", apron, 0)
     layers.extrusion("Paving", walk, 0.14, 0)
     layers.extrusion("Kerb", walk.intersection(pavement.buffer(0.14)), 0.155)
     junctions = {k for k, v in refs.items() if v > 1}
@@ -393,7 +422,12 @@ def build(records, route, stops, meta, dem, plateau=()):
         spawn_way=candidates[0][1],
         spawn_yaw_deg=round(yaw, 2),
         spawn_clearance_m=round(connected.boundary.distance(footprint(spawn, yaw)), 2),
-        road_area_m2=round(pavement.area),
+        road_area_m2=round(base_pavement.area),
+        turning_apron_area_m2=round(apron.area, 1),
+        estimated_turn_apron_junction_count=len(junctions),
+        ground_recovery_drop_m=GROUND_RECOVERY_DROP_M,
+        estimated_turn_apron_extra_m=JUNCTION_TURN_APRON_EXTRA_M,
+        simulation_turning_note="Temporary bus-friendly junction aprons are not surveyed real-world road widths.",
         footprint_count=len(buildings),
         signal_nodes=sum(t.get("highway") == "traffic_signals" for _, t, _ in signs),
     )
