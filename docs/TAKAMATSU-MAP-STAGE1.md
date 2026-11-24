@@ -50,6 +50,13 @@
 - [ ] WindowsでPlayしてAT/MTで発進・走行・停止・右左折を確認
 - [ ] 既存試走レベル・車両データの回帰テストとログを記録
 
+## 2026-11-24：Windows初回実行の修正
+
+- 最初の実機ログで `install_takamatsu_stage1.ps1:89` の `& $python -I -m pip install ...` 呼び出しにより、Windows PowerShell 5.1が「インデックスが配列の境界外です」を報告。**UEエディターのクラッシュではなく、ライブラリ準備中の停止**。
+- 旧地図アセットが消えたのではなく、インストーラーは `Recovery_Backup` から不足していた1086ファイル50点を復元し、`Build_001` と外部バックアップを確認済み。元のデータを再インポートせずに続行できる。
+- 依存導入に`Maps/TakamatsuStage1/bootstrap_wheels.py`を追加。pipなしで公式PyPIの**2つの指定Windows wheel**を取得し、`requirements-win64.txt`に記録済みのハッシュと照合して、`Saved`に展開。UEインストール本体への変更・ユーザーの個人アセットへの書込なし。失敗時は修正対象のエラーを診断ログに記録。
+- **修正後のWindows実機再試験は未実施。** GitHub DesktopでこのブランチをPullして、従来どおり `scripts/INSTALL_TAKAMATSU_STAGE1.cmd` をダブルクリックするだけ。以前の成功済みバックアップはそのまま再利用する。
+
 ## Windowsでの導入と実走確認
 
 **この工程はユーザーのWindowsで一度に検証する。** ローカルの既存1086車両、試走場、個人アセットはバージョン管理外にある。GitHub Desktopが変更破棄・上書きを提案した場合は**Discardを選択しない**。前回の更新で作られた外部 `Recovery_Backup` が残っていることを確認する。マップインストーラーは、不足している1086アセットだけを外部バックアップから回収し（既存は上書きしない）、さらに **初回インストール時に1086 ContentとConfigの外部バックアップを作ってSHA-256で一致確認**する。Gitブランチ切替前のバックアップを置き換えるものではない。
@@ -57,7 +64,7 @@
 一度の実機試験では、**①新規地図のタブ表示 ②AT前進・旋回・停止 ③完全MT半クラッチ発進・2速 ④自動クラッチMT発進 ⑤旧L_1086_DriveのAT走行 ⑥駅前の停車位置と進行方向 ⑦概要図・経路出典/欠測/フレームレート**まで確認する。エラー時は **`scripts/INSTALL_TAKAMATSU_STAGE1.cmd` が自動で診断レポートを開く**。成功後の不具合・位置ずれは `scripts/CHECK_TAKAMATSU_STAGE1.cmd` を一度ダブルクリックし、表示された `Saved/TakamatsuStage1/Stage1-Diagnostics.txt` とマップ画像を送る。UE上での運転操作は自動化されていないため、F310実走のみユーザーが行う。
 
 1. 動作確認済みの1086号車があるプロジェクトでUEを保存して終了する。GitHub Desktopの **Current branch → feature/takamatsu-map-stage1** を選び、**Fetch origin → Pull origin**。**Repository → Show in Explorer** でその作業フォルダーを開く。
-2. **scripts → INSTALL_TAKAMATSU_STAGE1.cmd** をダブルクリックする。初回はインターネットに接続する。公式GTFS・OSMの照合、標高と建物データの取得、Development Editorのビルド、新規マップの生成が順に進む。UEが一度閉じてから通常のエディターが開く。**Blueprintの手動編集・車体の配置は不要**。
+2. **scripts → INSTALL_TAKAMATSU_STAGE1.cmd** をダブルクリックする。初回はインターネットに接続する。**UE付属Pythonからpipは実行せず**、PyPI公式配布のNumPy 1.26.4・Shapely 2.1.2（Python 3.11 / Windows x64）をSHA-256で検証し、`Saved/TakamatsuStage1` にだけ展開する。続いて公式GTFS・OSMの照合、標高と建物データの取得、Development Editorのビルド、新規マップの生成が順に進む。UEが一度閉じてから通常のエディターが開く。**Blueprintの手動編集・車体の配置は不要**。
 3. エディターのタブに **L_TakamatsuStation47** と表示されることを確認する。上部の **Play** の隣の **⋮ → Selected Viewport** を選び、**Play**。ゲーム画面をクリックする。マップにはPlayerStartが1つあり、レベルのGameModeが既存の1086号車をスポーンする。
 4. **AT** ではHUDの **AT / N / Park ON** を確認。Aを押して停車保持、**1** でD、**Space** で駐車ブレーキ解除。Aを離して **RT** で発進、左スティックで旋回、**A** で停止する。**C** で車外から後輪・縁石の間隔を確認する。**K** で既存CSVの記録を開始・終了できる。
 5. **MT** は停車・Park ONで **T**、**I** で始動。LTを踏んで **RB** で1速、Park解除後にLTを徐々に戻して発進する。停車・Park ONで再度Tを押すと自動クラッチMT。交差点への進入・後輪の内輪差・次停留所での停止を確認する。最後に **Esc → Content Drawer → Kotoden1086 → 使用中のBuild → L_1086_Drive** を開き、従来の試走場でも確認する。[既存の1086操作表](1086-MT.md)
