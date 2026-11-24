@@ -1,8 +1,23 @@
 """Small oriented details in metres. +u runs along a facade, -v faces the street."""
 
 import math
+import re
 
 from shapely.geometry import Polygon
+
+
+def number(s, default, lo, hi):
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:m)?", str(s).strip())
+    return float(m[1]) if m and lo <= float(m[1]) <= hi else default
+
+
+def solids(geometry):
+    if geometry.geom_type == "Polygon":
+        if not geometry.is_empty and geometry.area > 0.002:
+            yield geometry
+    elif hasattr(geometry, "geoms"):
+        for part in geometry.geoms:
+            yield from solids(part)
 
 
 def quad(layers, name, corners, uv=None):

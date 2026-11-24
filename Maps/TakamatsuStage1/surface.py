@@ -1,7 +1,6 @@
 """Ground-level street surfaces and bus clearance checks. Input data remains inspectable."""
 
 import math
-import re
 from collections import Counter, defaultdict
 
 from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
@@ -10,6 +9,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, substring, unary_union
 from architecture import buildings as add_building_fronts
 from street_details import decorate
+from street_mesh import number, solids
 from survey import BBOX, is_five, project
 
 ROAD_WIDTH = {
@@ -41,20 +41,6 @@ ROUTE_WIDTH_FOCUS_M = 18.0
 BUS_ONE_WAY_SINGLE_M = 6.4
 BUS_TWO_WAY_M = 7.6
 BUS_LANE_ESTIMATE_M = 3.8
-
-
-def number(s, default, lo, hi):
-    m = re.fullmatch(r"(\d+(?:\.\d+)?)\s*(?:m)?", str(s).strip())
-    return float(m[1]) if m and lo <= float(m[1]) <= hi else default
-
-
-def solids(geometry):
-    if geometry.geom_type == "Polygon":
-        if not geometry.is_empty and geometry.area > 0.002:
-            yield geometry
-    elif hasattr(geometry, "geoms"):
-        for part in geometry.geoms:
-            yield from solids(part)
 
 
 class Layers:
@@ -179,7 +165,7 @@ def build(records, route, stops, meta, dem, plateau=(), roof_faces=None):
             not g.intersects(extent)
             or t.get("bridge", "no") != "no"
             or t.get("tunnel", "no") != "no"
-            or t.get("layer", "0") not in ("0", "")
+            or (t.get("layer", "0") not in ("0", "") and t.get("building") != "roof")
         ):
             continue
         hw = t.get("highway", "")
@@ -200,7 +186,9 @@ def build(records, route, stops, meta, dem, plateau=(), roof_faces=None):
             else:
                 continue
         elif t.get("building") == "roof" and list(solids(g)):
-            shelters.append((g, fid, "mapped roof footprint, 4.2 m clearance estimate"))
+            if str(t.get("layer", "")).startswith("-"):
+                continue
+            shelters.append((g, fid, "Mapped overhead roof outline"))
         elif "building" in t and t["building"] != "no" and list(solids(g)):
             h = number(t.get("height"), None, 1, 250)
             levels = number(t.get("building:levels"), None, 1, 80)
@@ -327,6 +315,13 @@ def build(records, route, stops, meta, dem, plateau=(), roof_faces=None):
     # untouched. The distinct material makes approximations visible in-game.
     corridors = route.buffer(ROUTE_WIDTH_FOCUS_M) if route is not None else stops[0].buffer(35)
     potential_width = unary_union([g.buffer(w / 2) for g, w in provisional_widths])
+    canopy = unary_union([g for g, _, _ in shelters])
+    # LOD1 models can enclose the air underneath a free-standing terminal canopy.
+    # Prefer a tagged roof outline there and keep the mapped vehicle clearance below it.
+    elevated = [item for item in plateau if canopy.intersection(item[0]).area > 0.6 * item[0].area]
+    for item in elevated:
+        evidence.append({"id": item[2], "basis": "Overlaps mapped canopy; roof layer supplies clearance"})
+    plateau = [item for item in plateau if item not in elevated]
     obstacles_for_width = unary_union([g for g, *_ in buildings] + [g for g, *_ in plateau])
     estimated_width = (
         potential_width.intersection(corridors)
@@ -339,8 +334,8 @@ def build(records, route, stops, meta, dem, plateau=(), roof_faces=None):
     pavement = unary_union([base_pavement, apron, estimated_width])
     walk = unary_union(walks + explicit_walks).difference(pavement).union(mapped_islands).intersection(extent)
     # Real extracts can leave isolated line fragments at a shared road/sidewalk edge.
-    walk_parts=list(solids(walk))
-    walk=unary_union(walk_parts) if walk_parts else Polygon()
+    walk_parts = list(solids(walk))
+    walk = unary_union(walk_parts) if walk_parts else Polygon()
     # Positive platform evidence outranks an undifferentiated station stop coordinate.
     platform_geom = min(platforms, key=lambda x: x[0])[2] if platforms else stops[0]
     pos = nearest_points(platform_geom, stops[0])[0]
@@ -360,13 +355,6 @@ def build(records, route, stops, meta, dem, plateau=(), roof_faces=None):
             raise ValueError("Route departs the mapped extent before a usable first leg")
         route = substring(route, 0, min(distances))
         meta["end_limit"] = "OSM survey window"
-    canopy = unary_union([g for g, _, _ in shelters])
-    # LOD1 models can enclose the air underneath a free-standing terminal canopy.
-    # Prefer a tagged roof outline there and keep the mapped vehicle clearance below it.
-    elevated = [item for item in plateau if canopy.intersection(item[0]).area > 0.6 * item[0].area]
-    for item in elevated:
-        evidence.append({"id": item[2], "basis": "Overlaps mapped canopy; roof layer supplies clearance"})
-    plateau = [item for item in plateau if item not in elevated]
     obstacles = unary_union([item[0] for item in list(plateau) + buildings])
     candidates = []
     for line, w, one, fid in roads:

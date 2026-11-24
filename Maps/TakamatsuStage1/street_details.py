@@ -4,10 +4,11 @@ import hashlib
 import math
 import random
 
-from shapely.geometry import Point
+from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
+from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points, unary_union
 
-from street_mesh import Frame
+from street_mesh import Frame, number, solids
 from survey import is_five, normalized
 
 
@@ -44,21 +45,39 @@ def shelter_detail(layers, roof, walk, road, obstacles, fid, evidence, eave, bas
     length = math.dist(a, b)
     width = rect.area / length
     # Coated sheet-metal soffit visible from the driving seat.
-    from surface import solids
-    from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
-
     for poly in solids(roof):
         for tri in get_parts(constrained_delaunay_triangles(poly)):
             layers.face(
                 "CanopyLining",
                 [(x, y, base + eave) for x, y in list(orient_polygons(tri).exterior.coords)[:3]][::-1],
             )
+    # Folded fascia and narrow drip edge follow the surveyed outline, including concave wings.
+    for poly in solids(roof):
+        for ring in (poly.exterior, *poly.interiors):
+            coords = list(ring.coords)
+            for a, b in zip(coords, coords[1:]):
+                span = math.dist(a, b)
+                if span < 0.4:
+                    continue
+                edge = Frame(layers, (*a, base), (b[0] - a[0], b[1] - a[1]))
+                edge.box("Frame", (span / 2, 0, eave + 0.055), (span, 0.085, 0.11))
+                edge.box("RoofMetal", (span / 2, 0, eave - 0.027), (span, 0.062, 0.04))
     usable = roof.difference(road.buffer(0.32)).difference(obstacles)
     count = 0
     bays = max(1, min(24, int(length / 4.4)))
     for i in range(bays):
         x = length * ((i + 0.5) / bays - 0.5)
-        for y in [0.0] if width < 4 else [-width * 0.27, width * 0.27]:
+        cross = LineString([frame.p(x, v, 0)[:2] for v in (-width * 2, width * 2)])
+        origin = Point(frame.p(x, 0, 0)[:2])
+        spans = get_parts(roof.intersection(cross))
+        offsets = []
+        for segment in spans:
+            if segment.geom_type != "LineString" or segment.length < 0.7:
+                continue
+            for fraction in [0.5] if segment.length < 4 else [0.23, 0.77]:
+                anchor = segment.interpolate(fraction, normalized=True)
+                offsets.append((anchor.y - origin.y) * frame.ux - (anchor.x - origin.x) * frame.uy)
+        for y in offsets:
             point = Point(frame.p(x, y, 0)[:2])
             if not usable.covers(point.buffer(0.16)):
                 continue
@@ -284,13 +303,21 @@ def decorate(
     # Keep surveyed anchors for the headline stop, with a small physical setback from the kerb.
     bay_known = "unverified" not in meta["platform_evidence"]
     start = place_zone(board, 0.53, max_shift=5)
-    if start is None:
+    # Some feeds put the stop at the lane centre, including wide divided roads.
+    # Use the nearest edge when it has room, otherwise retain only the source anchor.
+    if start is None and not road.is_empty:
+        edge = nearest_points(board, road.boundary)[1]
+        if board.distance(edge) <= 15:
+            start = place_zone(edge, 0.53, max_shift=3)
+    board_fits = start is not None
+    if not board_fits:
         start = board
     primary = facing_road(start)
-    stop_board(primary, 5 if bay_known else None, True)
+    if board_fits:
+        stop_board(primary, 5 if bay_known else None, True)
     record(
         meta["platform_evidence"],
-        "departure board",
+        "departure board" if board_fits else "stop anchor only",
         start,
         "Stop anchor from stage survey; cabinet, lettering and setback estimated",
     )
@@ -320,6 +347,7 @@ def decorate(
 
     # Known footprints take precedence; place a shelter estimate at the selected bay only when there
     # is room beside the road. On narrow platforms only the surveyed roof/board will be rendered.
+    roof_tags = {fid: tags for fid, tags, _, _ in records if tags.get("building") == "roof"}
     roofs = list(shelters)
     if bay_known and not any(roof.distance(start) < 13 for roof, _, _ in roofs):
         for off in (3.0, -3.0, 0.0):
@@ -333,15 +361,54 @@ def decorate(
                     )
                 )
                 break
+    hung_board = False
     for roof, fid, basis in roofs:
         clipped = roof.intersection(extent)
         if clipped.is_empty:
             continue
         base = layers.elevation(*clipped.representative_point().coords[0])
-        layers.extrusion("Shelters", clipped, 4.45, 4.2, False)
+        tags = roof_tags.get(fid, {})
+        top = number(tags.get("height"), None, 1.5, 50)
+        eave = number(tags.get("min_height"), None, 1.0, 48)
+        tagged_eave = eave is not None
+        if eave is None:
+            eave = top - 0.25 if top else 4.2
+        if top is None or top <= eave:
+            top = eave + 0.25
+        layers.extrusion("Shelters", clipped, top, eave, False)
         if clipped.intersects(focus):
-            shelter_detail(layers, clipped, walk, road, obstacles, fid, evidence, 4.2, base)
-        evidence.append({"id": fid, "basis": basis})
+            shelter_detail(layers, clipped, walk, road, obstacles, fid, evidence, eave, base)
+        # A double-sided suspended bay sign is readable on the approach as well as from the platform.
+        # Only install it beneath a nearby evidenced/estimated canopy on pedestrian ground.
+        if board_fits and bay_known and not hung_board and eave >= 3.15 and clipped.distance(start) < 6:
+            point = Point(primary.p(1.7, 0.25, 0)[:2])
+            sign_zone = clipped.intersection(free_walk).buffer(-0.78)
+            if not sign_zone.is_empty:
+                support = nearest_points(point, sign_zone)[1]
+                if point.distance(support) < 4.0:
+                    f = Frame(layers, (support.x, support.y, base), (-primary.uy, primary.ux))
+                    sign_z = eave - 0.64
+                    for x in (-0.41, 0.41):
+                        f.tube("Frame", (x, 0, sign_z + 0.23), (x, 0, eave), 0.014, sides=6)
+                    f.box("StopSign", (0, 0, sign_z), (1.27, 0.095, 0.50))
+                    f.print_panel(4, 0, -0.050, sign_z, 1.23, 0.465)
+                    rev = Frame(layers, f.origin, (-f.ux, -f.uy))
+                    rev.print_panel(4, 0, -0.050, sign_z, 1.23, 0.465)
+                    hung_board = True
+                    record(
+                        fid,
+                        "suspended bay sign",
+                        support,
+                        "Bay 5 confirmed; hanging sign and placement estimated",
+                    )
+        evidence.append(
+            {
+                "id": fid,
+                "basis": basis,
+                "eave_m": eave,
+                "eave_source": "OSM min_height" if tagged_eave else "estimated clearance",
+            }
+        )
     for offset in (3.0, -3.0, 5.0, -5.0):
         proposed = Point(primary.p(offset, 1.45, 0)[:2])
         loc = place_zone(proposed, 0.99, True, max_shift=1.8)
@@ -356,6 +423,23 @@ def decorate(
     # half for left-hand traffic, including oneway=-1 ways (normalised by the road builder).
     paint = []
     tactile = []
+    if bay_known and board_fits:
+        # Short bay end marks belong to the departure side, leaving the through lane clear.
+        line, width, _, way = nearest(start)
+        at = line.project(start)
+        if line.distance(start) <= width / 2 + 3.5 and 7 < at < line.length - 7:
+            for offset in (-6, 6):
+                q = line.interpolate(at + offset)
+                f = Frame(layers, (q.x, q.y, 0), tangent(line, at + offset))
+                side = 1 if (start.y - q.y) * f.ux - (start.x - q.x) * f.uy > 0 else -1
+                v = side * (width / 2 - 0.36)
+                paint.extend(
+                    [
+                        f.rect(0, v - side * 0.33, 0.14, 0.75),
+                        f.rect(-math.copysign(0.60, offset), v, 1.34, 0.14),
+                    ]
+                )
+            record(way, "bay end marks", start, "Provisional boarding-bay paint beside corroborated platform")
     for fid, p in crossings:
         line, w, _, _ = nearest(p)
         if line.distance(p) > w / 2 + 1:
@@ -492,7 +576,7 @@ def decorate(
             lamp(facing_road(loc))
             record(fid, "street lamp", loc, "Mapped node; pole profile and arm estimated")
     for fid, p in mapped_trees:
-        loc = place_zone(p, 1.25, max_shift=2.2)
+        loc = place_zone(p, 1.75, max_shift=2.2)
         if loc is not None:
             tree(facing_road(loc), fid + str(round(p.x)), 4.65)
             record(fid, "tree", loc, "OSM vegetation; species, spacing for rows and crown estimated")
@@ -510,7 +594,7 @@ def decorate(
                 )
         p = Point(primary.p(offset + 3, 3.25, 0)[:2])
         if not any(g.distance(p) < 12 for _, g in mapped_trees):
-            loc = place_zone(p, 1.25, True, max_shift=2)
+            loc = place_zone(p, 1.48, True, max_shift=2)
             if loc is not None:
                 tree(facing_road(loc), str(offset), 3.75, True)
                 record(

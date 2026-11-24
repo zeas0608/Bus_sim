@@ -9,7 +9,7 @@ from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
 from shapely.geometry import LineString, Point
 from shapely.ops import unary_union
 
-from street_mesh import Frame
+from street_mesh import Frame, number
 from survey import normalized, project
 
 
@@ -174,8 +174,6 @@ def buildings(layers, footprints, plateau, records, extent, route, stop, roof_fa
 
     # Mapped above-ground building parts can carry measured tower/podium heights.
     # Clip each part to its parent and use its actual min_height. Leave uncovered parent space intact.
-    from surface import number
-
     pieces = [
         (fid, t, g)
         for fid, t, g, _ in records
@@ -184,7 +182,7 @@ def buildings(layers, footprints, plateau, records, extent, route, stop, roof_fa
         and g.intersects(extent)
     ]
     envelopes = []
-    partitioned=set()
+    partitioned = set()
     for g, h, fid, basis, t, low in outlines:
         child = []
         if not fid.startswith("PLATEAU/"):
