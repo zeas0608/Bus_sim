@@ -31,6 +31,14 @@ WALK = {"footway", "pedestrian", "path", "platform", "steps", "cycleway"}
 GROUND_RECOVERY_DROP_M = 0.025
 JUNCTION_TURN_APRON_EXTRA_M = 1.75
 JUNCTION_FOCUS_RADIUS_M = 12.0
+ROUTE_WIDTH_FOCUS_M = 18.0
+
+# Safety-only minimum widths for *inferred* carriageways close to a known
+# Route 47 shape. These are playable estimates, NOT measured Takamatsu widths.
+# OSM's explicit width tag always wins and is never expanded by this rule.
+BUS_ONE_WAY_SINGLE_M = 5.8
+BUS_TWO_WAY_M = 7.2
+BUS_LANE_ESTIMATE_M = 3.6
 
 
 def number(s, default, lo, hi):
@@ -147,6 +155,7 @@ def build(records, route, stops, meta, dem, plateau=()):
     node_positions, node_widths = {}, defaultdict(list)
     shelters = []
     lanes, explicit_walks, crossings = [], [], []
+    provisional_widths, provisional_width_evidence = [], []
     for fid, t, g, ids in records:
         if (
             not g.intersects(extent)
@@ -202,6 +211,25 @@ def build(records, route, stops, meta, dem, plateau=()):
             w = number(t.get("width"), None, 1.5, 60)
             width = w or (count * 3.1 if count else ROAD_WIDTH[kind])
             one = t.get("oneway") in ("yes", "1", "true", "-1") or t.get("junction") == "roundabout"
+            # Avoid globally making narrow streets look wider than their
+            # mapped width. For only the driven corridor, let an optional
+            # separately colored surface supplement inferred (unmeasured)
+            # widths. Roads with an explicit width tag remain unchanged.
+            corridor = route.buffer(ROUTE_WIDTH_FOCUS_M) if route is not None else stops[0].buffer(35)
+            if w is None and g.intersects(corridor):
+                lane_count = int(count) if count else (1 if one else 2)
+                if one and lane_count == 1:
+                    minimum = BUS_ONE_WAY_SINGLE_M
+                else:
+                    minimum = max(BUS_TWO_WAY_M, BUS_LANE_ESTIMATE_M * lane_count)
+                if minimum > width + 0.01:
+                    provisional_widths.append((g, minimum))
+                    provisional_width_evidence.append({
+                        "id": fid,
+                        "source_width_m": round(width, 2),
+                        "playable_estimate_m": round(minimum, 2),
+                        "reason": "No explicit OSM width; extra driving surface, not surveyed asphalt",
+                    })
             # Capture node locations before reversing the one-way line; ids
             # always refer to the source line order, not the travel direction.
             for nid, xy in zip(ids, g.coords):
@@ -263,7 +291,16 @@ def build(records, route, stops, meta, dem, plateau=()):
         node_positions[nid].buffer(max(node_widths[nid]) / 2 + JUNCTION_TURN_APRON_EXTRA_M)
         for nid in junctions
     ]).intersection(extent).difference(base_pavement).difference(mapped_islands)
-    pavement = unary_union([base_pavement, apron])
+    # Only add corridor width where source geometry has NO explicit width.
+    # Exclude mapped islands and buildings, and keep the source asphalt layer
+    # untouched. The distinct material makes approximations visible in-game.
+    corridors = route.buffer(ROUTE_WIDTH_FOCUS_M) if route is not None else stops[0].buffer(35)
+    potential_width = unary_union([g.buffer(w / 2) for g, w in provisional_widths])
+    obstacles_for_width = unary_union([g for g, *_ in buildings] + [g for g, *_ in plateau])
+    estimated_width = potential_width.intersection(corridors).difference(base_pavement).difference(
+        mapped_islands
+    ).difference(obstacles_for_width).intersection(extent)
+    pavement = unary_union([base_pavement, apron, estimated_width])
     walk = unary_union(walks + explicit_walks).difference(pavement).union(mapped_islands).intersection(extent)
     # Positive platform evidence outranks an undifferentiated station stop coordinate.
     platform_geom = min(platforms, key=lambda x: x[0])[2] if platforms else stops[0]
@@ -358,6 +395,7 @@ def build(records, route, stops, meta, dem, plateau=()):
     # 18 cm outside mapped polygons. OSM sidewalks remain raised and visible.
     layers.extrusion("Land", extent, -GROUND_RECOVERY_DROP_M)
     layers.extrusion("Asphalt", base_pavement, 0)
+    layers.extrusion("WidthEstimate", estimated_width, 0)
     layers.extrusion("TurningApron", apron, 0)
     layers.extrusion("Paving", walk, 0.14, 0)
     layers.extrusion("Kerb", walk.intersection(pavement.buffer(0.14)), 0.155)
@@ -423,6 +461,9 @@ def build(records, route, stops, meta, dem, plateau=()):
         spawn_yaw_deg=round(yaw, 2),
         spawn_clearance_m=round(connected.boundary.distance(footprint(spawn, yaw)), 2),
         road_area_m2=round(base_pavement.area),
+        estimated_width_extra_area_m2=round(estimated_width.area, 1),
+        estimated_width_segments=provisional_width_evidence,
+        width_reproduction_note="Mapped road widths retained. WidthEstimate is provisional for missing OSM width tags only.",
         turning_apron_area_m2=round(apron.area, 1),
         estimated_turn_apron_junction_count=len(junctions),
         ground_recovery_drop_m=GROUND_RECOVERY_DROP_M,
