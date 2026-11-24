@@ -12,13 +12,11 @@ function Restore-Missing1086Content {
     $targetBus = Join-Path $targetContent 'Kotoden1086'
     $snapshotRoot = Join-Path (Split-Path $ProjectRoot -Parent) 'Recovery_Backup'
 
-    # If a usable map is present, keep the existing Content entirely untouched.
-    $existingMaps = @()
-    if (Test-Path -LiteralPath $targetBus -PathType Container) {
-        $existingMaps = @(Get-ChildItem -LiteralPath $targetBus -Filter 'L_1086_Drive.umap' -File -Recurse -ErrorAction SilentlyContinue)
-    }
-    if ($existingMaps.Count -gt 0) {
-        Write-Host "Kotoden 1086 map exists; no asset recovery needed."
+    # A map alone is not sufficient. A branch switch can leave a .umap visible
+    # while its Blueprint or GameMode files are missing. Require a complete local level.
+    . (Join-Path $PSScriptRoot 'find_1086_level.ps1')
+    if ($null -ne (Find-1086Level $targetBus)) {
+        Write-Host "Complete Kotoden 1086 map exists; no asset recovery needed."
         return
     }
 

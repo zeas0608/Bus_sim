@@ -1,0 +1,10 @@
+{
+  "publisher":"高松市",
+  "license":"CC BY 4.0",
+  "revision":"1c6b29e89334dfcbbf123412395c3b49056daeb6",
+  "facilities":[
+    {"kind":"station","name":"JR高松駅","lon":134.0468208,"lat":34.35075,"dataset":"aed_location","record":"11 駅内コンコース"},
+    {"kind":"hotel","name":"JRホテルクレメント高松","lon":134.0481344,"lat":34.35215833,"dataset":"aed_location","record":"2 １階ロビー"},
+    {"kind":"tower","name":"高松シンボルタワー","lon":134.047050787493,"lat":34.3523768509963,"dataset":"tourist_facilities","record":"高松シンボルタワー"}
+  ]
+}

@@ -6,6 +6,6 @@ public class KotodenBusSimulatorEditor : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine" });
-        PrivateDependencyModuleNames.AddRange(new[] { "AssetRegistry", "PhysicsCore" });
+        PrivateDependencyModuleNames.AddRange(new[] { "AssetRegistry", "PhysicsCore", "MeshDescription", "StaticMeshDescription" });
     }
 }
