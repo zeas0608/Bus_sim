@@ -119,6 +119,20 @@ def footprint(p, yaw):
     return rotate(box(p.x - 1.16, p.y - 4.5, p.x + 1.16, p.y + 4.5), -yaw, origin=(p.x, p.y))
 
 
+def near_and_parallel_to_route(line, route):
+    # A crossing side street is NOT automatically part of the bus route just
+    # because it meets the route at a junction.
+    if route is None:
+        return False
+    point_on_line, point_on_route = nearest_points(line, route)
+    if point_on_line.distance(point_on_route) > ROUTE_WIDTH_FOCUS_M:
+        return False
+    a = heading(line, line.project(point_on_line))
+    b = heading(route, route.project(point_on_route))
+    # Compare undirected angles: OSM may digitise a road in reverse.
+    return abs((a - b + 90) % 180 - 90) < 40
+
+
 def swept_check(route, connected):
     # Treat the source line as an approximate FRONT axle path. Let the rear axle
     # follow with the 1086 rig's 4.40 m wheelbase. This tests geometry, not Chaos.
@@ -216,7 +230,8 @@ def build(records, route, stops, meta, dem, plateau=()):
             # separately colored surface supplement inferred (unmeasured)
             # widths. Roads with an explicit width tag remain unchanged.
             corridor = route.buffer(ROUTE_WIDTH_FOCUS_M) if route is not None else stops[0].buffer(35)
-            if w is None and g.intersects(corridor):
+            aligned = near_and_parallel_to_route(g, route) if route is not None else one
+            if w is None and g.intersects(corridor) and aligned:
                 lane_count = int(count) if count else (1 if one else 2)
                 if one and lane_count == 1:
                     minimum = BUS_ONE_WAY_SINGLE_M
