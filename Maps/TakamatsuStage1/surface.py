@@ -6,8 +6,9 @@ from collections import Counter, defaultdict
 
 from shapely import constrained_delaunay_triangles, get_parts, orient_polygons
 from shapely.affinity import rotate
-from shapely.geometry import LineString, Point, box
+from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, substring, unary_union
+from architecture import buildings as add_building_fronts
 from street_details import decorate
 from survey import BBOX, is_five, project
 
@@ -165,7 +166,7 @@ def swept_check(route, connected):
     )
 
 
-def build(records, route, stops, meta, dem, plateau=()):
+def build(records, route, stops, meta, dem, plateau=(), roof_faces=None):
     extent = box(*project(*BBOX[:2]), *project(*BBOX[2:]))
     roads, walks, islands, tagged_roads, buildings, signs = [], [], [], [], [], []
     platforms, refs, evidence = [], Counter(), []
@@ -259,7 +260,7 @@ def build(records, route, stops, meta, dem, plateau=()):
                 g = LineString(list(g.coords)[::-1])
             roads.append((g, width, one, fid))
             if count and count >= 2:
-                lanes.append((g, width, int(count), ids))
+                lanes.append((g, width, int(count), ids[::-1] if t.get("oneway") == "-1" else ids))
             for nid in set(ids):
                 refs[nid] += 1
             if t.get("sidewalk") in ("left", "right", "both"):
@@ -337,6 +338,9 @@ def build(records, route, stops, meta, dem, plateau=()):
     )
     pavement = unary_union([base_pavement, apron, estimated_width])
     walk = unary_union(walks + explicit_walks).difference(pavement).union(mapped_islands).intersection(extent)
+    # Real extracts can leave isolated line fragments at a shared road/sidewalk edge.
+    walk_parts=list(solids(walk))
+    walk=unary_union(walk_parts) if walk_parts else Polygon()
     # Positive platform evidence outranks an undifferentiated station stop coordinate.
     platform_geom = min(platforms, key=lambda x: x[0])[2] if platforms else stops[0]
     pos = nearest_points(platform_geom, stops[0])[0]
@@ -448,14 +452,9 @@ def build(records, route, stops, meta, dem, plateau=()):
                 dash = substring(stripe, s, min(s + 3, stripe.length)).buffer(0.075, cap_style="flat")
                 dividers.append(dash.difference(junction_keepout))
     layers.extrusion("Paint", unary_union(dividers).intersection(pavement), 0.024)
-    for geom, h, fid, basis in list(plateau) + buildings:
-        if fid.startswith("way/") or fid.startswith("relation/"):
-            if any(geom.intersection(p[0]).area > 0.5 * min(geom.area, p[0].area) for p in plateau):
-                continue
-        if geom.intersects(extent):
-            cropped = geom.intersection(extent)
-            layers.extrusion("Buildings", cropped, h, -0.25, False)
-            evidence.append({"id": fid, "building_height_m": h, "basis": basis})
+    add_building_fronts(
+        layers, buildings, plateau, records, extent, route, stops[0], roof_faces or {}, evidence
+    )
     board = nearest_points(pos, pavement.boundary)[1] if pavement.contains(pos) else pos
     primary = decorate(
         layers,

@@ -3,6 +3,8 @@
 import math
 import xml.etree.ElementTree as ET
 
+import numpy as np
+
 from shapely.geometry import Polygon, box
 from survey import BBOX, ORIGIN, project
 
@@ -67,7 +69,7 @@ class Elevation:
         return self.sample(e, n) - self.reference if self.variable else 0.0
 
 
-def plateau_buildings(path):
+def plateau_buildings(path, roof_faces=None):
     # Japan PLATEAU uses lat,lon,height (JGD2011 + vertical datum, EPSG:6697).
     root = ET.parse(path).getroot()
     ns = {"b": "http://www.opengis.net/citygml/building/2.0", "g": "http://www.opengis.net/gml"}
@@ -75,6 +77,25 @@ def plateau_buildings(path):
     if envelope is None or envelope.get("srsName", "").split("/")[-1].split(":")[-1] != "6697":
         raise ValueError("PLATEAU input requires CityGML 2.0 EPSG:6697")
     extent = box(*project(*BBOX[:2]), *project(*BBOX[2:]))
+
+    def ring(e):
+        if e is None or not e.text or e.get("srsDimension", "3") != "3":
+            return [], []
+        values = list(map(float, e.text.split()))
+        if len(values) % 3 or not all(math.isfinite(v) for v in values):
+            return [], []
+        return [project(lon, lat) for lat, lon in zip(values[::3], values[1::3])], values[2::3]
+
+    def patch(p):
+        xy, z = ring(p.find("g:exterior//g:posList", ns))
+        if len(xy) < 4:
+            return None
+        holes = [ring(e)[0] for e in p.findall("g:interior//g:posList", ns)]
+        poly = Polygon(xy, [r for r in holes if len(r) >= 4])
+        if poly.is_valid and poly.area > 0.05 and poly.intersects(extent):
+            return poly, xy, z
+        return None
+
     result = []
     for b in root.findall(".//b:Building", ns):
         height = b.find("b:measuredHeight", ns)
@@ -87,34 +108,38 @@ def plateau_buildings(path):
             ".//b:GroundSurface//g:Polygon", ns
         )
         if not candidates:
-            # In LOD1 solids the lowest horizontal polygon is the ground ring.
             candidates = b.findall(".//b:lod1Solid//g:Polygon", ns)
         surfaces = []
-        for p in candidates:
-
-            def ring(e):
-                if e is None or not e.text or e.get("srsDimension", "3") != "3":
-                    return [], []
-                a = list(map(float, e.text.split()))
-                return [project(lon, lat) for lat, lon in zip(a[::3], a[1::3])], a[2::3]
-
-            pts, z = ring(p.find("g:exterior//g:posList", ns))
-            if len(pts) < 4 or len(z) != len(pts):
-                continue
-            holes = [ring(e)[0] for e in p.findall("g:interior//g:posList", ns)]
-            poly = Polygon(pts, [r for r in holes if len(r) >= 4])
-            if poly.is_valid and poly.area > 1 and poly.intersects(extent):
+        for item in candidates:
+            face = patch(item)
+            if face is not None and face[0].area > 1:
+                poly, xy, z = face
                 surfaces.append((sum(z) / len(z), poly))
-        if surfaces:
-            low = min(item[0] for item in surfaces)
-            for z, p in surfaces:
-                if z - low < 1:
-                    result.append(
-                        (
-                            p,
-                            h,
-                            "PLATEAU/" + b.get("{" + ns["g"] + "}id", "unknown"),
-                            "CityGML measuredHeight, LOD footprint",
-                        )
-                    )
+        if not surfaces:
+            continue
+        fid = "PLATEAU/" + b.get("{" + ns["g"] + "}id", "unknown")
+        ground = min(item[0] for item in surfaces)
+        for z, poly in surfaces:
+            if z - ground < 1:
+                result.append((poly, h, fid, "CityGML measuredHeight, LOD footprint"))
+        if roof_faces is None:
+            continue
+        faces = []
+        for item in b.findall(".//b:RoofSurface/b:lod2MultiSurface//g:Polygon", ns):
+            face = patch(item)
+            if face is None:
+                continue
+            poly, xy, z = face
+            coords = np.array([(x, y, 1.0) for x, y in xy])
+            levels = np.array(z) - ground
+            slope, _, rank, _ = np.linalg.lstsq(coords, levels, rcond=None)
+            if (
+                rank == 3
+                and max(abs(coords @ slope - levels)) < 0.15
+                and min(levels) > 1
+                and max(levels) < h + 3
+            ):
+                faces.append((poly, slope))
+        if faces:
+            roof_faces[fid] = faces
     return result

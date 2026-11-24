@@ -188,7 +188,17 @@ def osm_features(path):
     for rel in root.findall("relation"):
         t = tags(rel)
         if t.get("type") != "multipolygon" or not any(
-            k in t for k in ("building", "area:highway", "highway", "public_transport", "amenity")
+            k in t
+            for k in (
+                "building",
+                "building:part",
+                "area:highway",
+                "highway",
+                "public_transport",
+                "amenity",
+                "landuse",
+                "leisure",
+            )
         ):
             continue
         members = [
@@ -209,7 +219,9 @@ def osm_features(path):
             continue
         is_area = line.is_ring and (
             t.get("area") == "yes"
-            or any(k in t for k in ("area:highway", "building"))
+            or any(k in t for k in ("area:highway", "building", "building:part", "landuse"))
+            or t.get("leisure") == "garden"
+            or t.get("natural") == "grassland"
             or t.get("public_transport") == "platform"
             or t.get("highway") == "platform"
         )
