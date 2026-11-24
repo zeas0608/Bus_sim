@@ -85,13 +85,27 @@ try {
     & $python -I $runner $deps --probe
     if ($LASTEXITCODE -ne 0) {
         if ($Offline) { throw 'Install the pinned wheels online once before requesting offline mode.' }
-        $tempDeps = Join-Path $run 'wheels'
-        & $python -I -m pip install --disable-pip-version-check --only-binary=:all: --no-deps --require-hashes --target $tempDeps -r (Join-Path $source 'requirements-win64.txt')
-        if ($LASTEXITCODE -ne 0) { throw 'Installing the pinned Windows wheels failed.' }
-        if (-not (Test-Path -LiteralPath $deps)) { Move-Item -LiteralPath $tempDeps -Destination $deps }
-        else { $deps = $tempDeps }
-        & $python -I $runner $deps --probe
-        if ($LASTEXITCODE -ne 0) { throw 'Bundled Python cannot load the map dependencies.' }
+        # PowerShell 5.1/UE bundled python.exe hit a native invocation failure
+        # with -m pip on Windows. Use the stdlib-only, hash-pinned wheel bootstrap.
+        # This never modifies UE's Python installation or invokes pip.
+        $tempDeps = Join-Path $run 'verified-wheels'
+        $cacheDir = Join-Path $saved 'WheelCache'
+        $bootstrap = Join-Path $source 'bootstrap_wheels.py'
+        if (-not (Test-Path -LiteralPath $bootstrap -PathType Leaf)) {
+            throw "Wheel bootstrap missing: $bootstrap"
+        }
+        Write-Host 'Preparing pinned NumPy/Shapely wheels without pip...'
+        & $python -I $bootstrap $tempDeps $cacheDir
+        if ($LASTEXITCODE -ne 0) { throw 'Dependency bootstrap failed. See STAGE1 DEPENDENCY ERROR above.' }
+        & $python -I $runner $tempDeps --probe
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Installed Win64 wheels did not import in Unreal Python 3.11; no project assets were changed.'
+        }
+        if (-not (Test-Path -LiteralPath $deps)) {
+            Move-Item -LiteralPath $tempDeps -Destination $deps -ErrorAction Stop
+        } else {
+            $deps = $tempDeps
+        }
     }
     $params = @('-I',$runner,$deps,'--saved',$saved)
     if ($Offline) { $params += '--offline' }
