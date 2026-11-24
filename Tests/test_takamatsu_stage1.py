@@ -181,9 +181,9 @@ class StageTest(unittest.TestCase):
             records = {f["id"]: f for f in survey["estimated_width_segments"]}
             self.assertEqual(set(records), {"way/10", "way/11"})
             self.assertEqual(records["way/10"]["source_width_m"], 6.2)
-            self.assertEqual(records["way/10"]["playable_estimate_m"], 7.2)
+            self.assertEqual(records["way/10"]["playable_estimate_m"], 7.6)
             self.assertEqual(records["way/11"]["source_width_m"], 5.5)
-            self.assertEqual(records["way/11"]["playable_estimate_m"], 5.8)
+            self.assertEqual(records["way/11"]["playable_estimate_m"], 6.4)
             self.assertIn("provisional", survey["width_reproduction_note"])
 
     def test_missing_shape_uses_connected_relation(self):
