@@ -46,6 +46,19 @@ def station_front(f, length, h):
         )
         f.tube("CanopyLining", (x, -0.26, arch(x)), (y, -0.26, arch(y)), 0.135, sides=10)
         wall(f, "Frame", x - 0.038, x + 0.038, bottom, arch(x), 0.18)
+        # The glazing sits behind a projecting arched brow. A folded metal edge casts a real shadow.
+        f.face(
+            "RoofMetal",
+            [
+                (x, -0.27, arch(x) + 0.09),
+                (x, -1.08, arch(x) + 0.09),
+                (y, -1.08, arch(y) + 0.09),
+                (y, -0.27, arch(y) + 0.09),
+            ],
+        )
+        f.tube("CanopyLining", (x, -1.09, arch(x)), (y, -1.09, arch(y)), 0.11, sides=10)
+        if i % 3 == 0:
+            f.tube("Frame", (x, -0.22, arch(x) - 0.55), (x, -1.07, arch(x)), 0.055, sides=8)
     for i in range(1, max(2, int(crown / 1.75))):
         z = i * 1.75
         if z >= crown:
@@ -56,10 +69,19 @@ def station_front(f, length, h):
     hsign = min(2.2, h * 0.18)
     f.box("StopSign", (0, -0.26, spring + 0.18), (min(span * 0.52, hsign * 3.5), 0.16, hsign))
     f.print_panel(12, 0, -0.345, spring + 0.18, min(span * 0.50, hsign * 3.45), hsign * 0.94)
-    f.box("RoofMetal", (0, -0.27, 3.10), (span * 0.67, 0.50, 0.16))
+    f.box("RoofMetal", (0, -0.71, 3.12), (span * 0.67, 1.40, 0.13))
+    f.box("Frame", (0, -1.38, 3.04), (span * 0.67, 0.085, 0.12))
+    for i in range(9):
+        u = span * 0.62 * (i / 8 - 0.5)
+        f.tube("Frame", (u, -0.20, 3.66), (u, -1.32, 3.17), 0.026, sides=6)
     for x in (-span * 0.19, 0, span * 0.19):
         wall(f, "WindowShade", x - 0.88, x + 0.88, 0.14, 2.76, 0.22)
-        wall(f, "Frame", x - 0.028, x + 0.028, 0.15, 2.76, 0.25)
+        f.box("Frame", (x, -0.245, 2.71), (1.81, 0.070, 0.095))
+        for jamb in (-0.87, 0, 0.87):
+            f.box("Frame", (x + jamb, -0.245, 1.43), (0.05, 0.065, 2.58))
+        for leaf in (-0.42, 0.42):
+            wall(f, "Blind", x + leaf - 0.38, x + leaf + 0.38, 1.03, 1.075, 0.255)
+            f.box("Frame", (x + leaf, -0.267, 0.22), (0.80, 0.038, 0.12))
 
 
 def facade(f, length, low, top, kind, focal, near, seed, finish):

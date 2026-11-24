@@ -427,9 +427,14 @@ def decorate(
         # Short bay end marks belong to the departure side, leaving the through lane clear.
         line, width, _, way = nearest(start)
         at = line.project(start)
-        if line.distance(start) <= width / 2 + 3.5 and 7 < at < line.length - 7:
+        if line.distance(start) <= width / 2 + 3.5:
+            # A way may end at the bay. Retain the end mark that fits its documented length.
             for offset in (-6, 6):
+                if not 1.4 < at + offset < line.length - 1.4:
+                    continue
                 q = line.interpolate(at + offset)
+                if any(p.distance(q) < 4.5 for _, p in crossings + signals):
+                    continue
                 f = Frame(layers, (q.x, q.y, 0), tangent(line, at + offset))
                 side = 1 if (start.y - q.y) * f.ux - (start.x - q.x) * f.uy > 0 else -1
                 v = side * (width / 2 - 0.36)
@@ -439,7 +444,19 @@ def decorate(
                         f.rect(-math.copysign(0.60, offset), v, 1.34, 0.14),
                     ]
                 )
-            record(way, "bay end marks", start, "Provisional boarding-bay paint beside corroborated platform")
+            if paint:
+                record(
+                    way, "bay end marks", start, "Provisional boarding-bay paint beside corroborated platform"
+                )
+            # Follow the kerb on the actual footway side even if the GTFS point lies at its end.
+            zone = primary.rect(0, 0.4, 13.0, 4.0)
+            warning = road.buffer(0.60).difference(road.buffer(0.30)).intersection(zone).intersection(walk)
+            if not warning.is_empty:
+                tactile.append(warning)
+                record(
+                    way, "boarding tactile strip", start, "Provisional warning tiles 0.30 m from mapped kerb"
+                )
+
     for fid, p in crossings:
         line, w, _, _ = nearest(p)
         if line.distance(p) > w / 2 + 1:

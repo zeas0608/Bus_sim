@@ -57,7 +57,7 @@ def paving(out):
         1.28,
     )
 
-    # Sixteen staggered 30 × 15 cm concrete blocks in each 1.2 m square repeat (4 x 8).
+    # Thirty-two staggered 30 × 15 cm concrete blocks in each 1.2 m square repeat (4 x 8).
     row = (Y * 8).astype(int)
     col = ((X * 4 + 0.5 * (row % 2)) % 4).astype(int)
     u = (X * 4 + 0.5 * (row % 2)) % 1
